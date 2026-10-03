@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Suppress import-cache writes before loading the read-only CLI commands."""
+import sys
+
+sys.dont_write_bytecode = True
+
+from buildharbor.cli import main
+
+raise SystemExit(main())

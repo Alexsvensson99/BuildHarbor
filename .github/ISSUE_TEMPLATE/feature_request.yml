@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a focused addition or contract change.
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        BuildHarbor 0.1 is intentionally limited to doctor, read-only plan, and guarded run for explicit builds/tests. The roadmap schedules archive/export, conflict detection, and read-only reporting separately.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete workflow fails or remains manual today?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal example
+      description: Show the project shape, trigger, and desired result without private data.
+    validations:
+      required: true
+  - type: dropdown
+    id: boundary
+    attributes:
+      label: Closest roadmap area
+      options:
+        - 0.1 build/test guard
+        - 0.2 archive/export, settings traversal, or workspace support
+        - 0.3 read-only reporting
+        - 1.0 compatibility or installation
+        - Outside the current roadmap
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Guard and failure behavior
+      description: Explain what must be checked before writes and what should happen when the check fails.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Existing alternatives
+      description: Describe any current Xcode flag, Swift option, script, or tool that partly addresses the problem.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope acknowledgement
+      options:
+        - label: I understand that cleanup, migration, global Xcode settings, background services, and filesystem sandboxing are outside BuildHarbor 0.1.
+          required: true

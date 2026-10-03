@@ -1,0 +1,14 @@
+.buildharbor.local.toml
+.buildharbor/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.xcresult/
+DerivedData/
+.build/
+xcuserdata/
+work/

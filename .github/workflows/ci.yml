@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  simulated-system-tests:
+    name: Simulated system tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+          - os: macos-15
+            python: '3.13'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install release package
+        run: python -m pip install .
+      - name: Unit and process tests with simulated system responses
+        run: python -m unittest discover -v
+      - name: Installed CLI smoke test
+        run: |
+          buildharbor --version
+          buildharbor plan --help
+      - name: Keep machine configuration and generated outputs out of Git
+        run: python scripts/check_publication.py

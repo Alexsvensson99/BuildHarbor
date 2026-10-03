@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "buildharbor"
+version = "0.1.0"
+description = "Review and guard selected Xcode output paths on an external APFS volume."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Alexander Svensson"}]
+dependencies = []
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Build Tools",
+]
+
+[tool.setuptools]
+script-files = ["scripts/buildharbor"]
+
+[project.urls]
+Repository = "https://github.com/Alexsvensson99/BuildHarbor"
+Issues = "https://github.com/Alexsvensson99/BuildHarbor/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]

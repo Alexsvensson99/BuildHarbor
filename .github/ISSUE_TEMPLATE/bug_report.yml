@@ -1,0 +1,75 @@
+name: Bug report
+description: Report reproducible BuildHarbor behavior that differs from its documented contract.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for making the report concrete. Redact usernames, private project paths, real volume UUIDs, signing material, and secrets. For a vulnerability, use the private security link instead.
+  - type: dropdown
+    id: command
+    attributes:
+      label: Affected command
+      options:
+        - doctor
+        - plan
+        - run
+        - Installation or startup
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: BuildHarbor version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include macOS, Python, and exact Xcode version/build when relevant.
+      placeholder: macOS …; Python …; Xcode … (build …)
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Minimal setup
+      description: Describe the project selector and path shape. Replace local mount names, UUIDs, and private paths with obvious placeholders.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use the smallest sequence that shows the problem. Do not include destructive cleanup or migration steps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exact diagnostic and exit status. Attach only redacted plan or receipt output.
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: Last known working version
+      description: Leave blank if this has never worked or you do not know.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed secrets, private paths, and real volume identifiers from this report.
+          required: true
+        - label: I am not reporting a security vulnerability in this public issue.
+          required: true

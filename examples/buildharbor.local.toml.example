@@ -1,0 +1,5 @@
+# Copy to .buildharbor.local.toml in your project; keep that file out of Git.
+schema_version = 1
+mount = "/Volumes/Developer SSD"
+volume_uuid = "REPLACE-WITH-YOUR-APFS-VOLUME-UUID"
+storage_root = "/Volumes/Developer SSD/BuildHarbor"
