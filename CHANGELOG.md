@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — 2026-10-04
+## 0.3.0 — 2026-10-05
 
 Version 0.3.0 is the first release line after 0.1.0. It includes the archive/export and effective-setting work developed during the unpublished 0.2 checkpoint, plus read-only storage reporting. See the [release notes](docs/release-0.3.0.md) and [verification record](docs/verification-0.3.md) for the exact compatibility and evidence boundary.
 
