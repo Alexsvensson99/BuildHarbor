@@ -2,7 +2,7 @@
 
 Thank you for helping make BuildHarbor safer and easier to understand. The useful contributions here are usually small and specific: one guard case, one clearer diagnostic, one verified toolchain fixture, or one documentation correction.
 
-BuildHarbor 0.1.0 has a deliberately limited published contract: `doctor`, read-only `plan`, and guarded `run` for explicit command-line builds and tests. The validated 0.2 development checkpoint adds restrictive project/workspace traversal, effective-setting checks, local macOS archives, and local Copy App exports. The current local 0.3 work adds bounded, read-only storage reporting. Its controlled report fixture and 117-test suite on Python 3.11.13 and 3.13.4 have passed; final archive/export regression and clean-install checks remain. Neither development line has been published. Cleanup, migration, global Xcode settings, GUI Xcode behavior, background services, and general filesystem sandboxing remain outside the project scope.
+BuildHarbor 0.1.0 has a deliberately limited published contract: `doctor`, read-only `plan`, and guarded `run` for explicit command-line builds and tests. The validated 0.2 development checkpoint adds restrictive project/workspace traversal, effective-setting checks, local macOS archives, and local Copy App exports. The current local 0.3 work adds bounded, read-only storage reporting. Its controlled report fixture and 117-test suite on Python 3.11.13 and 3.13.4 have passed, along with the final archive/export regression and clean installation. Neither development line has been published. Cleanup, migration, global Xcode settings, GUI Xcode behavior, background services, and general filesystem sandboxing remain outside the project scope.
 
 ## Before changing code
 

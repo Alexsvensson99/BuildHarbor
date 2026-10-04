@@ -6,7 +6,7 @@ BuildHarbor is a local command runner with a narrow storage guard. It is designe
 
 Security fixes are provided for the latest 0.1.x release while 0.1 is current. The policy will be updated when another release line becomes supported.
 
-Version 0.2 is a development line, not a supported public release. Its additional security boundary is documented here so the implementation can be reviewed before any release decision. The [0.2 verification record](docs/verification-0.2.md) separates the controlled local evidence from the open CI and release gate. Version 0.3 storage reporting is implemented only in the current local checkout; its [verification record](docs/verification-0.3.md) remains incomplete until the final archive/export regression and clean-install checks finish.
+Version 0.2 is a development line, not a supported public release. Its additional security boundary is documented here so the implementation can be reviewed before any release decision. The [0.2 verification record](docs/verification-0.2.md) separates the controlled local evidence from the open CI and release gate. Version 0.3 storage reporting is implemented only in the current local checkout; its [verification record](docs/verification-0.3.md) records passed local archive/export, storage-report, and clean-install checks while CI and release remain separate gates.
 
 ## Reporting a vulnerability
 

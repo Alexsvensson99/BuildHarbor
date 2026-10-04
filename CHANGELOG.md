@@ -4,7 +4,7 @@
 
 ### 0.3 local development
 
-Implementation, the controlled real-storage report fixture, and all 117 unit/process tests on Python 3.11.13 and 3.13.4 are complete. The final archive/export regression and clean-install checks are in progress. [The 0.3 verification record](docs/verification-0.3.md) separates completed and open evidence. These changes are available only from the current local checkout; no 0.3 release has been published.
+Implementation, the controlled real-storage report fixture, and all 117 unit/process tests on Python 3.11.13 and 3.13.4 are complete. The final archive/export regression and clean installation also passed. [The 0.3 verification record](docs/verification-0.3.md) separates completed and open evidence. These changes are available only from the current local checkout; no 0.3 release has been published.
 
 - Add `report [--project-dir DIR ...] [--json]` for bounded, read-only accounting of one exact configured storage root without requiring Xcode.
 - Group unique regular-file inodes into known project, shared, and unattributed buckets. Ambiguous project IDs, unknown locations, unseen hard links, and conflicting metadata stay unattributed.

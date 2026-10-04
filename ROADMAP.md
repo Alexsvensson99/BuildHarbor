@@ -86,7 +86,7 @@ Status: the implementation and one controlled local build/test/workspace/archive
 
 ## 0.3 — read-only storage reporting
 
-Status: implemented in the current local checkout. A controlled real-storage fixture passed with reconciled project, shared, unattributed, absent-root, and incomplete outcomes while preserving the checked content and metadata. All 117 unit/process tests pass under Python 3.11.13 and 3.13.4. The final archive/export regression and clean-install checks are in progress. [The 0.3 verification record](docs/verification-0.3.md) separates completed and open evidence. No 0.3 release has been published.
+Status: implemented in the current local checkout. A controlled real-storage fixture passed with reconciled project, shared, unattributed, absent-root, and incomplete outcomes while preserving the checked content and metadata. All 117 unit/process tests pass under Python 3.11.13 and 3.13.4. The final archive/export regression and clean installation also passed. [The 0.3 verification record](docs/verification-0.3.md) separates completed and open evidence. No 0.3 release has been published.
 
 ### Scope
 

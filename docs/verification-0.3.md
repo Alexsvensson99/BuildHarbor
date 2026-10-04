@@ -46,7 +46,17 @@ Runtime archive checks validate effective signing settings and inspect the produ
 
 ## Clean installation
 
-The isolated installation check is the final local gate. Its result will be recorded here after installing the candidate from its local Git revision into a fresh virtual environment on the verified external volume. It must complete `--version`, `doctor`, `plan`, and `report` without changing source/package contents or stable metadata, and without creating package bytecode.
+The isolated installation check passed from local candidate revision `42712e097fcd81d6e639c72a5d722843cbc98e02`. `scripts/verify_install.py` extracted that committed source, copied the ignored configuration only into the private source copy, and installed version **0.3.0** into a fresh virtual environment on the verified external volume. Build dependencies, temporary data, and installation evidence also used that volume.
+
+Private evidence set `install-6b190939f2af426396fc6d767911f8b3` records exit 0 for `--version`, `doctor`, `plan`, and `report`. Doctor was ready for planning; the build plan correctly left effective settings pending until a guarded run; the storage report was complete. The check did not execute Xcode or a build action.
+
+Snapshots matched all 154 source-tree entries and 16 installed-package entries before and after those commands. Contents, modes, modification times, and change times were unchanged; no package bytecode was present before or after. Access times were excluded. Subsequent changes to this candidate only finalize documentation and the verification record.
+
+## Final review
+
+The publication checker passed for all 81 publishable files and reachable Git history. Manual review kept local configuration, private paths, real volume UUIDs, credentials, generated output, and raw logs outside that history. Relative documentation links and whitespace checks passed.
+
+A bounded read-only diagnostic review covered 2026-10-04 02:27:00–02:56:35 UTC, after the Xcode runs had finished. It parsed one recent diagnostic file and found no matching Harbor, XCTest, xcodebuild, Swift, or Clang reports, with no inventory warnings. No diagnostic files were removed or modified. This is a time- and process-scoped observation, not a general machine-health claim.
 
 ## Remaining release work
 
