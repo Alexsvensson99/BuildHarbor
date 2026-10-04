@@ -35,20 +35,20 @@ The runtime baseline is Python 3.11 or newer using only the standard library. Th
 - Build and test fixtures cover spaces in paths and use fake volume identities. No personal mount path or real volume UUID is committed.
 - Documentation describes the limits above and does not imply GUI Xcode coverage, cleanup, migration, archive/export support, or filesystem isolation.
 
-## Three-developer pilot
+## Internal readiness before 0.2
 
-The 0.1 pilot is capped at exactly three external developers. It begins only after the 0.1 acceptance criteria pass; this roadmap does not authorize contacting or enrolling anyone.
+Development remains maintainer-led and uses controlled fixtures. Moving to 0.2 requires a dated internal validation record from one candidate revision that meets every gate below:
 
-For each developer, record:
+- the full automated suite passes on every supported CI environment;
+- the real Xcode fixture completes guarded build and test runs on each exact toolchain build claimed as supported;
+- the package fixture fetches a repository over loopback HTTP and places both its checkout and repository cache beneath the planned storage root;
+- a repeated build preserves the selected object and compiled-module modification times used to check cache reuse;
+- fail-closed fixtures cover missing, replaced, internal, non-APFS, read-only, and UUID-mismatched volumes, plus symlink and destination conflicts, and confirm that rejected commands never start the child process;
+- concurrency, signal-forwarding, child-reaping, exit-status, and receipt-failure checks pass;
+- a clean installation completes `--version`, `doctor`, and `plan` without changing source files or creating package bytecode; and
+- publication checks and manual review find no machine configuration, private paths, real volume UUIDs, credentials, or generated build output in publishable history.
 
-- setup minutes, measured from starting the documented install to the first successful `doctor` and `plan`;
-- minutes to the first successful guarded `run`;
-- every project-specific exception or configuration change needed;
-- every false block, with the command, reason, and the later evidence showing it was safe;
-- every unsafe condition that was incorrectly allowed;
-- repeat usage, counted as successful guarded runs on separate days.
-
-Expand beyond the pilot only if all three developers complete a build or test, all three return for at least two later days, median setup is at most 15 minutes, no setup exceeds 30 minutes, there are no unsafe allows, and there are no unresolved false blocks. Hold the rollout if any condition is missed. The resulting evidence decides whether 0.2 work proceeds or 0.1 needs another corrective release.
+Any unresolved unsafe allow, managed output unexpectedly written to internal storage, child process started after a rejected guard, or failure to reproduce the supported Xcode integration keeps work in 0.1 maintenance. Other failures must be recorded with their scope and either resolved or explicitly removed from the supported claim before 0.2 starts.
 
 ## 0.2 — archive/export and effective-setting conflicts
 
@@ -61,7 +61,7 @@ Expand beyond the pilot only if all three developers complete a build or test, a
 
 ### Dependencies
 
-- A completed three-developer pilot or an explicit hold decision with the blocking findings resolved.
+- The internal 0.1 readiness gates above have current evidence for one candidate revision.
 - Stable 0.1 configuration and receipt schemas.
 - Primary-source and executable evidence for every newly managed archive/export flag and effective setting.
 - Fixtures covering workspace membership, nested project references, and conflicts in non-root projects.
@@ -101,12 +101,12 @@ Expand beyond the pilot only if all three developers complete a build or test, a
 - Stabilize the portable configuration, local configuration, plan, receipt, and exit-status contracts.
 - Publish a compatibility policy and a migration path for any later schema change.
 - Provide an easy, reproducible installation path without adding runtime dependencies.
-- Support the Xcode versions and project shapes demonstrated by external pilot evidence.
+- Support only the Xcode versions and project shapes demonstrated by maintained internal compatibility fixtures.
 
 ### Dependencies
 
-- Successful 0.1 pilot evidence and follow-up external pilots for archive/export and reporting.
-- Documented compatibility fixtures for every supported Xcode build.
+- Dated internal verification records for the stable build/test, archive/export, settings-analysis, and reporting contracts included in 1.0.
+- Documented compatibility fixtures for every supported Xcode build and project shape.
 - At least one release cycle proving that older supported configuration and receipt schemas remain readable.
 
 ### Acceptance criteria
@@ -114,5 +114,7 @@ Expand beyond the pilot only if all three developers complete a build or test, a
 - Supported 0.x configuration files retain their meaning or fail with a precise migration instruction.
 - A clean installation, first `doctor`, and first `plan` follow one documented path and require no source checkout edits.
 - Compatibility claims name exact tested Xcode builds and macOS versions.
-- External pilots cover build, test, archive/export, disconnection, conflict, and recovery cases without an unsafe allow.
+- Controlled fixtures cover build, test, archive/export, disconnection, conflict, recovery, and schema compatibility without an unsafe allow.
 - Security, contribution, and comparison documents match the shipped behavior.
+
+Version 1.0 does not imply a broader-adoption program. If broader adoption is ever considered, it requires a separate readiness decision based on the product state at that time.

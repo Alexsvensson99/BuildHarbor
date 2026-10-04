@@ -1,5 +1,7 @@
 BuildHarbor 0.1.0 adds a volume guard and a reviewable plan/run/receipt workflow for selected Xcode outputs on an external APFS disk.
 
+This is an early development release. I am focusing on my own controlled projects and internal validation; it is too early to invite other developers to use it.
+
 I kept this release focused on three commands: `doctor`, read-only `plan`, and `run` for explicit `build` and `test` actions. It checks the configured volume UUID, refuses unsafe or conflicting managed paths, reuses build directories, allocates unique test results, and records local run receipts. It does not change global Xcode settings or migrate existing data.
 
 ## Install
@@ -32,6 +34,6 @@ Version 0.1.0 accepts a conservative set of arguments for a single plain `.xcode
 
 BuildHarbor is not a filesystem sandbox. Build scripts, plugins, Xcode services, simulators, macOS, and some SwiftPM global metadata caches may write elsewhere. Preflight validation cannot guarantee protection from every mid-build disconnection, and destination failure may prevent a receipt from being saved. JSON/configuration contracts remain experimental.
 
-The [roadmap](https://github.com/Alexsvensson99/BuildHarbor/blob/v0.1.0/ROADMAP.md) starts with a three-developer pilot before deciding whether to expand into archive/export and better effective-setting analysis. The pilot has not been run.
+The [current roadmap](https://github.com/Alexsvensson99/BuildHarbor/blob/main/ROADMAP.md) prioritizes internal validation, reproducible fixtures, and resolving known limitations. That evidence will guide further work on archive/export and effective-setting analysis. Broader use requires a separate readiness decision.
 
 MIT licensed. No PyPI, Homebrew, or other registry publication is included.

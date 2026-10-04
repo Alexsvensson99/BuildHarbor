@@ -1,0 +1,91 @@
+name: Internal validation record
+description: Record one maintainer-run check against a controlled fixture.
+title: "[Internal validation] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for maintainer-led validation against controlled fixtures. Redact personal paths, real volume UUIDs, signing material, credentials, and private project details before saving the issue.
+  - type: input
+    id: revision
+    attributes:
+      label: Candidate revision
+      description: Record the exact commit SHA or release tag that was checked.
+      placeholder: Commit SHA or release tag
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS …; architecture …; Python …; Xcode … (build …)
+    validations:
+      required: true
+  - type: dropdown
+    id: check_area
+    attributes:
+      label: Validation area
+      options:
+        - Automated safety suite
+        - Guarded Xcode build and test
+        - Package checkout and repository cache
+        - Repeat-build cache reuse
+        - Installation and read-only commands
+        - Locking, signals, and receipts
+        - Publication and privacy review
+        - Compatibility and schema regression
+        - Other controlled fixture
+    validations:
+      required: true
+  - type: textarea
+    id: fixture
+    attributes:
+      label: Fixture and preconditions
+      description: Describe the controlled input, expected storage state, and relevant configuration using redacted values.
+    validations:
+      required: true
+  - type: textarea
+    id: procedure
+    attributes:
+      label: Checks performed
+      description: List the commands or inspection steps needed to reproduce this validation. Do not include secrets or private paths.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: State the observable condition that determines whether this check passes.
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome
+      options:
+        - Passed
+        - Failed
+        - Inconclusive
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Observed evidence
+      description: Record exit statuses, bounded output, file observations, and other evidence needed to assess the outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: follow_up
+    attributes:
+      label: Failure, limitation, or follow-up
+      description: Record the affected claim and required next action. Write “None” only when the evidence is complete for this check.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed private paths, real volume UUIDs, signing material, credentials, and private project details.
+          required: true

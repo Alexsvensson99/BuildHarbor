@@ -27,7 +27,7 @@ The tests simulate missing volumes, wrong UUIDs, internal/non-APFS volumes, lock
 - SwiftPM's global manifest/metadata caches: the package-cache flag is verified here for the repository cache. Some global SwiftPM metadata still uses toolchain-selected locations outside BuildHarbor's project tree.
 - Precompiled-header and install-staging writes: the paths are configured, but this fixture does not produce a PCH or perform an install action. An empty directory is recorded as empty.
 - Complete protection from mid-build disconnection, hostile filesystem races, force-kills, or descendants that detach from the process group.
-- External pilot results. The three-developer pilot in the roadmap is planned; nobody was contacted or enrolled for this release.
+- Use beyond maintainer-controlled projects and fixtures has not been validated. The next step is further internal development and verification.
 
 Receipts report observed presence after a run. Existing cached contents may predate that run. They are not a filesystem trace or proof that no writes occurred elsewhere.
 

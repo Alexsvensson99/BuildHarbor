@@ -4,7 +4,9 @@ BuildHarbor checks an external APFS volume before routing selected Xcode build o
 
 I want an external build drive to be an explicit part of the workflow. A path under `/Volumes` is not enough: the expected disk needs to be mounted, unlocked, writable, and identified by its volume UUID. If those checks fail, BuildHarbor stops before launching the build.
 
-This first version is for independent Apple developers and small teams using command-line builds, including builds started by coding agents. It uses Python 3.11 or later and has no third-party runtime dependencies. The source is MIT licensed.
+The intended audience is independent Apple developers and small teams using command-line builds, including builds started by coding agents. For now, I am focusing on my own controlled projects and internal validation. It is too early to invite other developers to use it.
+
+BuildHarbor uses Python 3.11 or later and has no third-party runtime dependencies. The source is MIT licensed.
 
 ## Requirements and installation
 
@@ -122,9 +124,9 @@ If the disk is absent, locked, wrong, read-only, below the configured capacity t
 - Preflight checks and directory-fd operations reduce accidental path mistakes. They cannot guarantee protection against every mount change, malicious local race, force-kill, or mid-build disconnection. A failed or disconnected destination can also prevent receipt creation; that failure is reported.
 - There is no automatic cleanup, data migration, global Xcode configuration, simulator relocation, background service, archive/export support, or registry publication in this release.
 - The JSON objects carry `schema_version: 1`; their full contract is still experimental until 1.0.
-- The initial compatibility evidence is a small macOS fixture. It does not establish iOS/simulator, signing, large-project, or external-pilot compatibility.
+- The initial compatibility evidence is a small macOS fixture. It does not establish iOS/simulator, signing, large-project, or broader project compatibility.
 - Some SwiftPM global manifest/metadata caches use toolchain-selected locations. The package-cache routing verified here covers repository caching; it does not relocate every SwiftPM cache.
 
 External storage and Xcode path configuration already exist. BuildHarbor's focus is the tested volume guard and a plan/run/receipt workflow you can review. [Comparison with DevCleaner, mac-ssd-rescue, VibeChard, and fastlane](docs/comparison.md).
 
-See the [roadmap and three-developer pilot](ROADMAP.md), [contribution guide](CONTRIBUTING.md), [security scope](SECURITY.md), and [architecture decision](docs/adr/0001-storage-guard.md).
+See the [roadmap and internal validation plan](ROADMAP.md), [contribution guide](CONTRIBUTING.md), [security scope](SECURITY.md), and [architecture decision](docs/adr/0001-storage-guard.md).
