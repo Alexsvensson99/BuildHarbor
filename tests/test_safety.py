@@ -103,6 +103,12 @@ class SafetyTests(unittest.TestCase):
         self.assertNotEqual(first.outputs["result_bundle"], second.outputs["result_bundle"])
         self.assertNotIn(first.outputs["result_bundle"], first.directories)
 
+    def test_build_routes_error_result_bundle_too(self):
+        plan = self.plan()
+        self.assertIn("-resultBundlePath", plan.command)
+        self.assertEqual(plan.command[plan.command.index("-resultBundlePath") + 1], str(plan.outputs["result_bundle"]))
+        self.assertNotIn(plan.outputs["result_bundle"], plan.directories)
+
     def test_duplicate_flags_and_settings_rejected(self):
         for extra in (["-scheme", "Other"], ["-jobs", "1", "-jobs", "2"], ["CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_ALLOWED=NO"]):
             with self.subTest(extra=extra), self.assertRaises(BuildHarborError):

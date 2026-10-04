@@ -48,7 +48,10 @@ def main():
     shutil.copytree(repo / "fixtures/HarborFixture/Packages/HarborSupport", remote)
     for command in (["init", "-q", "-b", "main"], ["add", "."], ["-c", "user.name=BuildHarbor Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-qm", "Create local package fixture"], ["tag", "1.0.0"]):
         subprocess.run(["git", "-C", str(remote), *command], check=True)
-    bare = remote.parent / "HarborSupport.git"
+    # SwiftPM fingerprints package identity + version beyond this checkout.
+    # Each freshly committed fixture needs its own identity, not a retagged 1.0.0.
+    remote_name = f"HarborSupport-{uuid.uuid4().hex[:12]}.git"
+    bare = remote.parent / remote_name
     subprocess.run(["git", "clone", "--bare", "--quiet", str(remote), str(bare)], check=True)
     subprocess.run(["git", "-C", str(bare), "update-server-info"], check=True)
     # A loopback-only HTTP Git remote exercises repository caching; file:// remotes
@@ -61,7 +64,7 @@ def main():
     pbx = project / "project.pbxproj"
     text = pbx.read_text()
     text = text.replace("XCLocalSwiftPackageReference", "XCRemoteSwiftPackageReference")
-    remote_url = f"http://127.0.0.1:{server.server_port}/HarborSupport.git"
+    remote_url = f"http://127.0.0.1:{server.server_port}/{remote_name}"
     text = text.replace("relativePath = Packages/HarborSupport;", f'repositoryURL = "{remote_url}";\n            requirement = {{ kind = exactVersion; version = 1.0.0; }};')
     pbx.write_text(text)
     config = replace(config, project_root=source, project_id="remote-fixture")

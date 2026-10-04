@@ -171,9 +171,8 @@ def make_plan(config: Config, arguments: list[str], environment: dict[str, str] 
         "precompiled_headers": storage / "PrecompiledHeaders",
         "temporary": storage / "Temporary",
         "receipt": storage / "Receipts" / f"{run_id}.json",
+        "result_bundle": storage / "Results" / f"{run_id}.xcresult",
     }
-    if action == "test":
-        outputs["result_bundle"] = storage / "Results" / f"{run_id}.xcresult"
     for path in outputs.values():
         validate_destination(path, config, volume)
     directories = tuple(path.parent if name in {"receipt", "result_bundle"} else path for name, path in outputs.items())
