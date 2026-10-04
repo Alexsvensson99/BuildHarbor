@@ -19,7 +19,7 @@ class Volume:
     permission_metadata: bool = True
 
 
-def inspect_volume(config: Config) -> Volume:
+def inspect_volume(config: Config, *, read_only: bool = False) -> Volume:
     if sys.platform != "darwin":
         raise BuildHarborError("BuildHarbor requires macOS and a mounted external APFS volume.")
     mount = config.mount
@@ -40,7 +40,7 @@ def inspect_volume(config: Config) -> Volume:
         raise BuildHarborError("The mounted volume UUID or mount point does not match local configuration.")
     if disk.get("FilesystemType") != "apfs" or disk.get("Internal") is not False:
         raise BuildHarborError("The destination must be an external APFS volume.")
-    if disk.get("Locked", False) or disk.get("ReadOnlyVolume", False) or disk.get("WritableVolume") is not True:
+    if disk.get("Locked", False) or (not read_only and (disk.get("ReadOnlyVolume", False) or disk.get("WritableVolume") is not True)):
         raise BuildHarborError("The configured APFS volume is locked or read-only.")
     try:
         info = os.statvfs(mount)
@@ -49,8 +49,9 @@ def inspect_volume(config: Config) -> Volume:
             raise BuildHarborError("The destination changed during volume inspection.")
     except OSError as exc:
         raise BuildHarborError("The destination became unavailable during volume inspection.") from exc
-    if available < config.minimum_free_bytes:
+    if not read_only and available < config.minimum_free_bytes:
         raise BuildHarborError("The destination has less available capacity than minimum_free_gib requires.")
-    if not os.access(mount, os.W_OK | os.X_OK):
-        raise BuildHarborError("Permission metadata does not allow writing and traversal on the volume.")
+    access = os.R_OK | os.X_OK if read_only else os.W_OK | os.X_OK
+    if not os.access(mount, access):
+        raise BuildHarborError("Permission metadata does not allow the required access and traversal on the volume.")
     return Volume(before, available, config.volume_uuid)

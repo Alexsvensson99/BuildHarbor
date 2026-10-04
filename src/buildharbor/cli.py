@@ -27,8 +27,17 @@ def main(argv: list[str] | None = None) -> int:
             command.add_argument("--json", action="store_true", help="Print a schema-versioned JSON report.")
         if name != "doctor":
             command.add_argument("xcode_arguments", nargs=argparse.REMAINDER, help="Use -- followed by xcodebuild arguments.")
+    report = sub.add_parser("report", help="Read storage usage without changing files or offering cleanup.")
+    report.add_argument("--project-dir", type=Path, action="append", help="Configured project directory; repeat for projects sharing exactly one storage root. Defaults to the current directory.")
+    report.add_argument("--json", action="store_true", help="Print a schema-versioned storage report.")
     args = parser.parse_args(argv)
     try:
+        if args.command == "report":
+            from .storage import scan_storage, render_storage
+            configs = [load_config(root) for root in (args.project_dir or [Path.cwd()])]
+            result = scan_storage(configs)
+            print(json.dumps(result, indent=2) if args.json else render_storage(result))
+            return 0 if result["status"] == "complete" else 2
         config = load_config(args.project_dir)
         if args.command == "doctor":
             volume = inspect_volume(config)

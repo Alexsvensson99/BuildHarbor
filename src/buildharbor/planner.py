@@ -19,7 +19,7 @@ VALUE_OPTIONS = {
     "-arch", "-jobs", "-destination-timeout", "-parallel-testing-enabled",
     "-parallel-testing-worker-count", "-maximum-parallel-testing-workers",
     "-maximum-concurrent-test-device-destinations", "-maximum-concurrent-test-simulator-destinations",
-    "-testPlan", "-enableCodeCoverage", "-testLanguage", "-testRegion",
+    "-enableCodeCoverage", "-testLanguage", "-testRegion",
 }
 SWITCH_OPTIONS = {"-quiet", "-showBuildTimingSummary", "-disableAutomaticPackageResolution", "-onlyUsePackageVersionsFromResolvedFile", "-skipPackageUpdates"}
 BOOLEAN_SETTINGS = {"CODE_SIGNING_ALLOWED", "CODE_SIGNING_REQUIRED", "ONLY_ACTIVE_ARCH", "ENABLE_TESTABILITY"}
@@ -36,7 +36,7 @@ MANAGED_SETTINGS.update(PATH_SETTINGS)
 MANAGED_SETTINGS.update(STATIC_ONLY_SETTINGS)
 FORBIDDEN_ENV = MANAGED_SETTINGS - {"TMPDIR"} | {"XCODE_XCCONFIG_FILE", "TOOLCHAINS"} | SIGNING_ENV_SETTINGS
 TEST_ONLY_OPTIONS = {
-    "-testPlan", "-enableCodeCoverage", "-testLanguage", "-testRegion",
+    "-enableCodeCoverage", "-testLanguage", "-testRegion",
     "-parallel-testing-enabled", "-parallel-testing-worker-count", "-maximum-parallel-testing-workers",
     "-maximum-concurrent-test-device-destinations", "-maximum-concurrent-test-simulator-destinations",
 }

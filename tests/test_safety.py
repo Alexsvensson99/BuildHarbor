@@ -152,6 +152,12 @@ class SafetyTests(unittest.TestCase):
             with self.subTest(extra=extra), self.assertRaises(BuildHarborError):
                 self.plan(self.arguments + extra)
 
+        with self.assertRaisesRegex(BuildHarborError, "Unsupported action or option"):
+            parse_arguments(
+                ["-project", "Demo.xcodeproj", "-scheme", "Demo", "test", "-testPlan", "Unit"],
+                self.project,
+            )
+
     def test_terminal_control_and_bidi_characters_are_rejected(self):
         for value in ("Demo\x1b[2J", "Demo\tHidden", "Demo\x7f", "Demo\u202eHidden"):
             arguments = ["-project", "Demo.xcodeproj", "-scheme", value, "build"]

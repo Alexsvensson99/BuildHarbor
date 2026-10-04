@@ -76,13 +76,14 @@ def _require_absent_outputs(plan: Plan, *, after_inspection: bool = False) -> No
         raise BuildHarborError("A unique output appeared after planning; existing data will not be overwritten.")
 
 
-def _write_export_options(plan: Plan, volume: Volume) -> None:
+def _write_export_options(plan: Plan, volume: Volume) -> tuple[int, int]:
     path = plan.outputs["export_options"]
     directory = open_directory(path.parent, plan.config, volume)
     fd = None
     try:
         fd = os.open(path.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
-        if os.fstat(fd).st_dev != volume.device_id:
+        created = os.fstat(fd)
+        if not stat.S_ISREG(created.st_mode) or created.st_dev != volume.device_id or created.st_nlink != 1:
             raise BuildHarborError("Export options crossed onto another filesystem.")
         payload = EXPORT_OPTIONS_BYTES
         while payload:
@@ -91,6 +92,70 @@ def _write_export_options(plan: Plan, volume: Volume) -> None:
                 raise OSError("zero-byte write")
             payload = payload[count:]
         os.fsync(fd)
+        completed = os.fstat(fd)
+        if (
+            not stat.S_ISREG(completed.st_mode)
+            or completed.st_dev != volume.device_id
+            or completed.st_nlink != 1
+            or completed.st_size != len(EXPORT_OPTIONS_BYTES)
+            or (completed.st_dev, completed.st_ino) != (created.st_dev, created.st_ino)
+        ):
+            raise BuildHarborError("The generated export options file changed while it was written.")
+        return completed.st_dev, completed.st_ino
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(directory)
+
+
+def _revalidate_export_options(plan: Plan, volume: Volume, identity: tuple[int, int]) -> None:
+    """Bind Xcode's generated plist input to the exact file BuildHarbor wrote."""
+    path = plan.outputs["export_options"]
+    directory = open_directory(path.parent, plan.config, volume)
+    fd = None
+    try:
+        fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        before = os.fstat(fd)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_dev != volume.device_id
+            or before.st_nlink != 1
+            or (before.st_dev, before.st_ino) != identity
+            or before.st_size != len(EXPORT_OPTIONS_BYTES)
+        ):
+            raise BuildHarborError("The generated export options file changed before export.")
+        data = bytearray()
+        remaining = len(EXPORT_OPTIONS_BYTES) + 1
+        while remaining:
+            chunk = os.read(fd, remaining)
+            if not chunk:
+                break
+            data.extend(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(fd)
+        stable = (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_nlink,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) == (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_nlink,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+        if not stable or bytes(data) != EXPORT_OPTIONS_BYTES:
+            raise BuildHarborError("The generated export options file changed before export.")
+    except BuildHarborError:
+        raise
+    except OSError as exc:
+        raise BuildHarborError("Cannot safely revalidate the generated export options file.") from exc
     finally:
         if fd is not None:
             os.close(fd)
@@ -352,6 +417,7 @@ def _record_prelaunch_failure(plan: Plan, result: str, message: str, exit_code: 
 def execute(plan: Plan) -> int:
     """Execute *plan* and return xcodebuild's shell-style exit status."""
     lock_fd: int | None = None
+    export_options_identity: tuple[int, int] | None = None
     try:
         try:
             volume = _revalidate(plan)
@@ -395,10 +461,11 @@ def execute(plan: Plan) -> int:
             if packages is not None and inspect_resolved_packages(plan.outputs["package_clones"]) != packages:
                 raise BuildHarborError("Resolved package manifests changed before the requested action.")
             if plan.action == "export":
-                _write_export_options(plan, volume)
+                export_options_identity = _write_export_options(plan, volume)
                 volume = _revalidate(plan)
                 _revalidate_inputs(plan, volume)
                 _require_absent_outputs(plan, after_inspection=True)
+                _revalidate_export_options(plan, volume, export_options_identity)
         except SettingsError as exc:
             return _record_prelaunch_failure(plan, "settings_failed", str(exc), exc.exit_code)
         except BuildHarborError as exc:

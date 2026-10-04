@@ -145,6 +145,22 @@ class ProjectInspectionTests(unittest.TestCase):
         with self.assertRaisesRegex(BuildHarborError, "pre-actions"):
             inspect_projects(outer, self.root, MANAGED)
 
+    def test_shared_scheme_test_plan_references_are_rejected(self):
+        project = self.make_project("Planned.xcodeproj", target("T1", "Planned"))
+        self.write_scheme(
+            project,
+            "Planned.xcodeproj",
+            "T1",
+            actions=(
+                '<TestAction><TestPlans><TestPlanReference '
+                'reference="container:Plans/Planned.xctestplan" default="YES"/>'
+                "</TestPlans></TestAction>"
+            ),
+        )
+
+        with self.assertRaisesRegex(BuildHarborError, "test plans"):
+            inspect_projects(project, self.root, MANAGED)
+
     def test_conditional_managed_setting_cannot_hide_behind_comment_markers(self):
         project = self.make_project(
             "Conflict.xcodeproj",

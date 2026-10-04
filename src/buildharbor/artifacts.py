@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import plistlib
@@ -71,20 +72,33 @@ def inspect_archived_app(archive, config, volume):
 
 def archive_digest(path, config, volume, *, max_entries=100000, max_bytes=4 * 1024**3, timeout=60):
     """Hash a bounded archive tree; reject symlinks rather than follow export inputs."""
+    if (
+        type(max_entries) is not int or not 1 <= max_entries <= 100000
+        or type(max_bytes) is not int or not 1 <= max_bytes <= 4 * 1024**3
+        or type(timeout) not in (int, float) or not 0 < timeout <= 60
+        or not math.isfinite(timeout)
+    ):
+        raise BuildHarborError("Archive inspection bounds exceed the fixed safe limits or are invalid.")
     digest = hashlib.sha256()
     started = time.monotonic()
     count = 0
     byte_count = 0
 
-    def visit(fd, relative):
+    def visit(fd, relative, depth=0):
         nonlocal count, byte_count
+        if depth > 64:
+            raise BuildHarborError("The archive exceeds the bounded inspection depth.")
         before = os.fstat(fd)
+        names = []
         with os.scandir(fd) as entries:
-            names = sorted(entry.name for entry in entries)
-        for name in names:
-            count += 1
-            if count > max_entries or time.monotonic() - started > timeout:
-                raise BuildHarborError("The archive exceeds the bounded input inspection limit.")
+            for entry in entries:
+                count += 1
+                if count > max_entries or time.monotonic() - started > timeout:
+                    raise BuildHarborError("The archive exceeds the bounded input inspection limit.")
+                names.append(entry.name)
+        for name in sorted(names):
+            if time.monotonic() - started > timeout:
+                raise BuildHarborError("Archive inspection timed out.")
             info = os.stat(name, dir_fd=fd, follow_symlinks=False)
             if info.st_dev != volume.device_id:
                 raise BuildHarborError("The archive crosses onto another filesystem.")
@@ -95,7 +109,7 @@ def archive_digest(path, config, volume, *, max_entries=100000, max_bytes=4 * 10
                 try:
                     if (os.fstat(child).st_dev, os.fstat(child).st_ino) != (info.st_dev, info.st_ino):
                         raise BuildHarborError("An archive directory changed during inspection.")
-                    visit(child, child_name)
+                    visit(child, child_name, depth + 1)
                 finally:
                     os.close(child)
             elif stat.S_ISREG(info.st_mode):

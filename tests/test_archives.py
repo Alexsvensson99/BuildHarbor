@@ -152,6 +152,35 @@ class ArchiveTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, text)
 
+    def test_archive_collection_stops_before_exhausting_an_oversized_directory(self) -> None:
+        archive, _, _ = self.make_archive()
+        consumed = []
+
+        @contextmanager
+        def entries(_fd):
+            def produce():
+                for index in range(100):
+                    consumed.append(index)
+                    yield SimpleNamespace(name=f"entry-{index}")
+            yield produce()
+
+        with self.artifact_io(), mock.patch("buildharbor.artifacts.os.scandir", side_effect=entries):
+            with self.assertRaisesRegex(BuildHarborError, "bounded input inspection"):
+                archive_digest(archive, self.config, self.volume, max_entries=2)
+        self.assertEqual(len(consumed), 3)
+
+    def test_archive_depth_and_nonfinite_bounds_are_rejected(self) -> None:
+        archive, _, _ = self.make_archive()
+        nested = archive
+        for _ in range(66):
+            nested = nested / "d"
+            nested.mkdir()
+        with self.artifact_io(), self.assertRaisesRegex(BuildHarborError, "bounded inspection depth"):
+            archive_digest(archive, self.config, self.volume)
+        for arguments in ({"timeout": float("nan")}, {"timeout": float("inf")}, {"max_entries": 100001}):
+            with self.subTest(arguments=arguments), self.assertRaises(BuildHarborError):
+                archive_digest(archive, self.config, self.volume, **arguments)
+
     def test_valid_managed_archive_and_receipt_are_bound_together(self) -> None:
         archive, receipt_path, receipt = self.make_archive()
         with self.artifact_io():

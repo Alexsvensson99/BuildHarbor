@@ -33,5 +33,6 @@ jobs:
         run: |
           buildharbor --version
           buildharbor plan --help
+          buildharbor report --help
       - name: Keep machine configuration and generated outputs out of Git
         run: python scripts/check_publication.py

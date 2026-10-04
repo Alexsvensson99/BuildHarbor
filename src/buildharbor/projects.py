@@ -871,6 +871,8 @@ class _Inspector:
                 tag = self._tag(element)
                 if tag in {"PreActions", "PostActions", "ExecutionAction", "ActionContent"}:
                     raise BuildHarborError("Shared schemes with pre-actions or post-actions are unsupported.")
+                if tag in {"TestPlans", "TestPlanReference"}:
+                    raise BuildHarborError("Shared schemes with test plans are unsupported.")
                 if tag == "BuildableReference":
                     container = element.attrib.get("ReferencedContainer")
                     target_id = element.attrib.get("BlueprintIdentifier")

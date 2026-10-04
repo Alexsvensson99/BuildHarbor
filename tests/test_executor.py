@@ -14,6 +14,7 @@ import time
 import unittest
 from unittest import mock
 
+from buildharbor.artifacts import EXPORT_OPTIONS_BYTES
 from buildharbor.cli import main
 from buildharbor.config import Config
 from buildharbor.errors import BuildHarborError
@@ -72,6 +73,31 @@ class ExecutorTests(unittest.TestCase):
             directories=directories,
             run_id=run_id,
             project_storage=self.project_storage,
+        )
+
+    def make_export_plan(self, run_id: str) -> Plan:
+        plan = self.make_plan(run_id=run_id)
+        outputs = dict(plan.outputs)
+        outputs.update(
+            {
+                "export": self.project_storage / "Exports" / run_id,
+                "export_options": self.project_storage / "ExportOptions" / f"{run_id}.plist",
+                "temporary": self.project_storage / "Temporary",
+            }
+        )
+        directories = tuple(
+            dict.fromkeys(
+                (*plan.directories, outputs["export"].parent, outputs["export_options"].parent, outputs["temporary"])
+            )
+        )
+        return replace(
+            plan,
+            action="export",
+            outputs=outputs,
+            directories=directories,
+            unique_outputs=("export", "export_options", "receipt"),
+            inputs={"archive": self.root / "archive.xcarchive", "archive_receipt": self.root / "archive.json"},
+            input_hashes={"archive": "a" * 64, "archive_receipt": "b" * 64},
         )
 
     @staticmethod
@@ -325,6 +351,43 @@ class ExecutorTests(unittest.TestCase):
             self.assertEqual(execute(plan), 2)
         action.assert_not_called()
         self.assertEqual(plan.outputs["receipt"].read_text(), "existing evidence")
+
+    def test_generated_export_options_mutation_never_starts_action(self) -> None:
+        def overwrite(path: Path) -> None:
+            path.write_bytes(b"tampered export options")
+
+        def replace_inode(path: Path) -> None:
+            replacement = path.with_suffix(".replacement")
+            replacement.write_bytes(EXPORT_OPTIONS_BYTES)
+            os.replace(replacement, path)
+
+        def add_hardlink(path: Path) -> None:
+            os.link(path, path.with_suffix(".alias"))
+
+        for index, mutate in enumerate((overwrite, replace_inode, add_hardlink)):
+            with self.subTest(mutation=mutate.__name__):
+                plan = self.make_export_plan(f"export-mutation-{index}")
+                changed = False
+
+                def mutate_after_write(current: Plan, _volume: Volume) -> None:
+                    nonlocal changed
+                    options = current.outputs["export_options"]
+                    if options.exists() and not changed:
+                        changed = True
+                        mutate(options)
+
+                with (
+                    self.runtime(),
+                    mock.patch("buildharbor.executor.inspect_effective_settings", return_value={"status": "not_applicable"}),
+                    mock.patch("buildharbor.executor._revalidate_inputs", side_effect=mutate_after_write),
+                    mock.patch("buildharbor.executor._record_prelaunch_failure", return_value=2) as failure,
+                    mock.patch("buildharbor.executor._run_child") as action,
+                ):
+                    self.assertEqual(execute(plan), 2)
+
+                self.assertTrue(changed)
+                action.assert_not_called()
+                self.assertEqual(failure.call_args.args[1], "guard_failed")
 
     def test_cli_rejected_run_never_spawns(self) -> None:
         identity = self.root / "Demo.xcodeproj"
