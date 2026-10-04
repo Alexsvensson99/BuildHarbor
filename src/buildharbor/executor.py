@@ -16,10 +16,12 @@ import uuid
 from . import __version__
 from .errors import BuildHarborError
 from .paths import open_directory, validate_destination
-from .planner import Plan
+from .planner import Plan, FORBIDDEN_ENV
 from .reporting import LIMITATIONS
 from .volume import Volume, inspect_volume
 from .xcode import inspect_xcode
+from .artifacts import archive_digest, inspect_archived_app, read_receipt, EXPORT_OPTIONS_BYTES
+from .settings import SettingsError, inspect_effective_settings
 
 
 _SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
@@ -47,6 +49,52 @@ def _revalidate(plan: Plan) -> Volume:
     for path in plan.directories:
         validate_destination(path, plan.config, current)
     return current
+
+
+def _revalidate_inputs(plan: Plan, volume: Volume) -> None:
+    if plan.graph is not None:
+        from .projects import revalidate_graph
+        revalidate_graph(plan.graph, plan.config.project_root)
+    if plan.action == "export":
+        if archive_digest(plan.inputs["archive"], plan.config, volume) != plan.input_hashes["archive"]:
+            raise BuildHarborError("The archive changed after planning; export was not started.")
+        _, digest = read_receipt(plan.inputs["archive_receipt"], plan.config, volume)
+        if digest != plan.input_hashes["archive_receipt"]:
+            raise BuildHarborError("The archive receipt changed after planning; export was not started.")
+
+
+def _require_absent_outputs(plan: Plan, *, after_inspection: bool = False) -> None:
+    for name in plan.unique_outputs:
+        if name not in plan.outputs:
+            continue
+        if after_inspection and ("settings_result" in name or name == "export_options"):
+            continue
+        try:
+            plan.outputs[name].lstat()
+        except FileNotFoundError:
+            continue
+        raise BuildHarborError("A unique output appeared after planning; existing data will not be overwritten.")
+
+
+def _write_export_options(plan: Plan, volume: Volume) -> None:
+    path = plan.outputs["export_options"]
+    directory = open_directory(path.parent, plan.config, volume)
+    fd = None
+    try:
+        fd = os.open(path.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+        if os.fstat(fd).st_dev != volume.device_id:
+            raise BuildHarborError("Export options crossed onto another filesystem.")
+        payload = EXPORT_OPTIONS_BYTES
+        while payload:
+            count = os.write(fd, payload)
+            if count == 0:
+                raise OSError("zero-byte write")
+            payload = payload[count:]
+        os.fsync(fd)
+    finally:
+        if fd is not None:
+            os.close(fd)
+        os.close(directory)
 
 
 def _acquire_lock(directory_fd: int, volume: Volume) -> int:
@@ -215,12 +263,13 @@ def _make_receipt(
     result: str,
     exit_code: int,
     termination: dict[str, object],
+    validation: dict | None = None,
 ) -> dict[str, object]:
     observed: dict[str, dict[str, str]] = {}
     for name, path in plan.outputs.items():
         state = "file" if name == "receipt" else _directory_state(path, plan, volume)
         observed[name] = {"path": str(path), "state": state}
-    return {
+    receipt = {
         "schema_version": 1,
         "kind": "run_receipt",
         "tool_version": __version__,
@@ -230,11 +279,24 @@ def _make_receipt(
         "exit_code": exit_code,
         "termination": termination,
         "run_id": plan.run_id,
+        "project_id": plan.config.project_id,
+        "source_identity": str(plan.source_identity) if plan.source_identity is not None else None,
+        "settings_validation": validation or {"status": "not_completed"},
+        "inputs": {name: str(path) for name, path in plan.inputs.items()},
         "planned_paths": {name: str(path) for name, path in plan.outputs.items()},
         "observed_paths": observed,
         "observation_note": "Directory contents may predate this run. Presence is not proof of new writes, cache hits, or complete routing.",
         "unverified_behavior": list(LIMITATIONS),
     }
+    if plan.action == "archive" and result == "succeeded":
+        if not (plan.outputs["archive"] / "Info.plist").is_file():
+            raise BuildHarborError("Xcode returned success without the expected archive metadata.")
+        receipt["archive_sha256"] = archive_digest(plan.outputs["archive"], plan.config, volume)
+        receipt["archive_application"] = inspect_archived_app(plan.outputs["archive"], plan.config, volume)
+    if plan.action == "export" and result == "succeeded":
+        if not any(plan.outputs["export"].glob("*.app/Contents/Info.plist")):
+            raise BuildHarborError("Xcode returned success without an exported macOS application.")
+    return receipt
 
 
 def _write_receipt(plan: Plan, volume: Volume, receipt: dict[str, object]) -> None:
@@ -269,22 +331,22 @@ def _write_receipt(plan: Plan, volume: Volume, receipt: dict[str, object]) -> No
         os.close(directory_fd)
 
 
-def _record_prelaunch_failure(plan: Plan, result: str, message: str) -> int:
-    print(f"BuildHarbor did not launch xcodebuild: {message}", file=sys.stderr)
+def _record_prelaunch_failure(plan: Plan, result: str, message: str, exit_code: int = 2) -> int:
+    print(f"BuildHarbor did not start the requested action: {message}", file=sys.stderr)
     try:
         volume = _revalidate(plan)
         receipt = _make_receipt(
             plan,
             volume,
             result=result,
-            exit_code=2,
+            exit_code=exit_code,
             termination={"kind": "not_started"},
         )
         _write_receipt(plan, volume, receipt)
         print(f"BuildHarbor saved run receipt: {plan.outputs['receipt']}", file=sys.stderr)
     except (BuildHarborError, OSError):
         print("BuildHarbor could not safely record the prelaunch failure receipt.", file=sys.stderr)
-    return 2
+    return exit_code
 
 
 def execute(plan: Plan) -> int:
@@ -293,6 +355,8 @@ def execute(plan: Plan) -> int:
     try:
         try:
             volume = _revalidate(plan)
+            _revalidate_inputs(plan, volume)
+            _require_absent_outputs(plan)
             lock_fd = _create_directories(plan, volume)
         except BuildHarborError as exc:
             print(f"BuildHarbor could not prepare protected storage: {exc}", file=sys.stderr)
@@ -306,9 +370,41 @@ def execute(plan: Plan) -> int:
             current_xcode = inspect_xcode(environment)
             if current_xcode != plan.xcode:
                 raise BuildHarborError("The selected Xcode changed after planning.")
+            if any(environment.get(key) for key in FORBIDDEN_ENV):
+                raise BuildHarborError("Output/compiler environment overrides appeared after planning.")
             volume = _revalidate(plan)
+            _revalidate_inputs(plan, volume)
+            _require_absent_outputs(plan)
         except BuildHarborError as exc:
             return _record_prelaunch_failure(plan, "guard_failed", str(exc))
+
+        try:
+            validation = inspect_effective_settings(plan, lock_fd, environment)
+            packages = None
+            if plan.graph is not None and plan.graph.remote_packages:
+                from .projects import inspect_resolved_packages
+                packages = inspect_resolved_packages(plan.outputs["package_clones"])
+                if not packages:
+                    raise BuildHarborError("Resolved package manifests are missing from the managed checkout directory.")
+                validation["resolved_package_manifests"] = len(packages)
+            # Metadata queries can take time and may mutate project metadata.
+            # Recheck original inputs, storage and unique action leaves afterward.
+            volume = _revalidate(plan)
+            _revalidate_inputs(plan, volume)
+            _require_absent_outputs(plan, after_inspection=True)
+            if packages is not None and inspect_resolved_packages(plan.outputs["package_clones"]) != packages:
+                raise BuildHarborError("Resolved package manifests changed before the requested action.")
+            if plan.action == "export":
+                _write_export_options(plan, volume)
+                volume = _revalidate(plan)
+                _revalidate_inputs(plan, volume)
+                _require_absent_outputs(plan, after_inspection=True)
+        except SettingsError as exc:
+            return _record_prelaunch_failure(plan, "settings_failed", str(exc), exc.exit_code)
+        except BuildHarborError as exc:
+            return _record_prelaunch_failure(plan, "guard_failed", str(exc))
+        except OSError:
+            return _record_prelaunch_failure(plan, "guard_failed", "A filesystem operation failed during guarded inspection.")
 
         try:
             child_result = _run_child(plan, lock_fd, environment)
@@ -322,6 +418,7 @@ def execute(plan: Plan) -> int:
                 result="succeeded" if child_result.exit_code == 0 else "failed",
                 exit_code=child_result.exit_code,
                 termination=child_result.termination,
+                validation=validation,
             )
             _write_receipt(plan, volume, receipt)
             print(f"BuildHarbor saved run receipt: {plan.outputs['receipt']}", file=sys.stderr)

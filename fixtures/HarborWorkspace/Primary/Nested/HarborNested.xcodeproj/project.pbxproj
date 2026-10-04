@@ -1,0 +1,190 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E40000000000000000000001 /* HarborNested.c in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000001 /* HarborNested.c */; };
+		E40000000000000000000002 /* HarborNested.h in Headers */ = {isa = PBXBuildFile; fileRef = F40000000000000000000002 /* HarborNested.h */; settings = {ATTRIBUTES = (Public, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F40000000000000000000001 /* HarborNested.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = HarborNested.c; sourceTree = "<group>"; };
+		F40000000000000000000002 /* HarborNested.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HarborNested.h; sourceTree = "<group>"; };
+		F40000000000000000000003 /* libHarborNested.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libHarborNested.a; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		G40000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				C40000000000000000000002 /* Sources */,
+				C40000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C40000000000000000000002 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				F40000000000000000000001 /* HarborNested.c */,
+				F40000000000000000000002 /* HarborNested.h */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		C40000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F40000000000000000000003 /* libHarborNested.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		G40000000000000000000003 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E40000000000000000000002 /* HarborNested.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		A40000000000000000000001 /* HarborNested */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = J40000000000000000000002 /* Build configuration list for PBXNativeTarget "HarborNested" */;
+			buildPhases = (
+				G40000000000000000000003 /* Headers */,
+				G40000000000000000000001 /* Sources */,
+				G40000000000000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HarborNested;
+			productName = HarborNested;
+			productReference = F40000000000000000000003 /* libHarborNested.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B40000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					A40000000000000000000001 = {CreatedOnToolsVersion = 27.0; };
+				};
+			};
+			buildConfigurationList = J40000000000000000000001 /* Build configuration list for PBXProject "HarborNested" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base, );
+			mainGroup = C40000000000000000000001;
+			productRefGroup = C40000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A40000000000000000000001 /* HarborNested */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		G40000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E40000000000000000000001 /* HarborNested.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		I40000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		I40000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		I40000000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				EXECUTABLE_PREFIX = lib;
+				PRODUCT_NAME = HarborNested;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		I40000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				EXECUTABLE_PREFIX = lib;
+				PRODUCT_NAME = HarborNested;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		J40000000000000000000001 /* Build configuration list for PBXProject "HarborNested" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (I40000000000000000000001 /* Debug */, I40000000000000000000002 /* Release */, );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		J40000000000000000000002 /* Build configuration list for PBXNativeTarget "HarborNested" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (I40000000000000000000011 /* Debug */, I40000000000000000000012 /* Release */, );
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B40000000000000000000001 /* Project object */;
+}

@@ -187,7 +187,7 @@ class SafetyTests(unittest.TestCase):
     def test_rejected_cli_run_never_spawns_a_child(self):
         argv = [
             "run", "--project-dir", str(self.project), "--",
-            "-project", "Demo.xcodeproj", "-scheme", "Demo", "archive",
+            "-project", "Demo.xcodeproj", "-scheme", "Demo", "clean",
         ]
         with patch("buildharbor.cli.load_config", return_value=self.config), patch(
             "buildharbor.planner.inspect_xcode", side_effect=AssertionError("Rejected arguments must not inspect Xcode")

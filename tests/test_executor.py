@@ -276,7 +276,7 @@ class ExecutorTests(unittest.TestCase):
     def test_disk_loss_after_success_returns_two_without_fallback_receipt(self) -> None:
         plan = self.make_plan()
         lost = BuildHarborError("destination unavailable")
-        with self.runtime(volumes=[self.volume, self.volume, lost]):
+        with self.runtime(volumes=[self.volume, self.volume, self.volume, lost]):
             self.assertEqual(execute(plan), 2)
         self.assertFalse(plan.outputs["receipt"].exists())
 
@@ -304,6 +304,28 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(launch_receipt["result"], "launch_failed")
         self.assertEqual(launch_receipt["termination"], {"kind": "not_started"})
 
+    def test_failed_settings_inspection_never_starts_action(self) -> None:
+        from buildharbor.settings import SettingsError
+        plan = self.make_plan()
+        with self.runtime(), mock.patch("buildharbor.executor.inspect_effective_settings", side_effect=SettingsError("unsafe settings")), mock.patch("buildharbor.executor._run_child") as action:
+            self.assertEqual(execute(plan), 2)
+        action.assert_not_called()
+        receipt = json.loads(plan.outputs["receipt"].read_text())
+        self.assertEqual(receipt["result"], "settings_failed")
+        self.assertEqual(receipt["termination"], {"kind": "not_started"})
+
+    def test_unique_output_created_during_inspection_blocks_action(self) -> None:
+        plan = self.make_plan()
+
+        def introduce_output(*_):
+            plan.outputs["receipt"].write_text("existing evidence")
+            return {"status": "passed"}
+
+        with self.runtime(), mock.patch("buildharbor.executor.inspect_effective_settings", side_effect=introduce_output), mock.patch("buildharbor.executor._run_child") as action:
+            self.assertEqual(execute(plan), 2)
+        action.assert_not_called()
+        self.assertEqual(plan.outputs["receipt"].read_text(), "existing evidence")
+
     def test_cli_rejected_run_never_spawns(self) -> None:
         identity = self.root / "Demo.xcodeproj"
         identity.mkdir()
@@ -324,7 +346,7 @@ class ExecutorTests(unittest.TestCase):
                     "Demo.xcodeproj",
                     "-scheme",
                     "Demo",
-                    "archive",
+                    "clean",
                 ]
             )
         self.assertEqual(result, 2)

@@ -1,0 +1,2 @@
+// Negative traversal fixture. BuildHarbor must reject this output override.
+SYMROOT = $(PROJECT_DIR)/DO_NOT_BUILD_INTERNAL_OUTPUT

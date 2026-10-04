@@ -1,11 +1,10 @@
 """Construct a reviewable build command without creating files or launching Xcode."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import os
 from pathlib import Path
-import re
 import uuid
 
 from .config import Config
@@ -13,9 +12,10 @@ from .errors import BuildHarborError
 from .paths import validate_destination
 from .volume import Volume, inspect_volume
 from .xcode import Xcode, inspect_xcode
+from .settings import PATH_SETTINGS, STATIC_ONLY_SETTINGS, SIGNING_ENV_SETTINGS
 
 VALUE_OPTIONS = {
-    "-project", "-scheme", "-configuration", "-destination", "-sdk",
+    "-project", "-workspace", "-scheme", "-configuration", "-destination", "-sdk",
     "-arch", "-jobs", "-destination-timeout", "-parallel-testing-enabled",
     "-parallel-testing-worker-count", "-maximum-parallel-testing-workers",
     "-maximum-concurrent-test-device-destinations", "-maximum-concurrent-test-simulator-destinations",
@@ -32,7 +32,9 @@ MANAGED_SETTINGS = {
     "SDK_STAT_CACHE_DIR", "INDEX_DATA_STORE_DIR", "INDEX_PRECOMPS_DIR", "TEMP_DIR", "TMPDIR",
     "OTHER_CFLAGS", "OTHER_CPLUSPLUSFLAGS", "OTHER_SWIFT_FLAGS", "OTHER_LDFLAGS",
 }
-FORBIDDEN_ENV = MANAGED_SETTINGS - {"TMPDIR"} | {"XCODE_XCCONFIG_FILE", "TOOLCHAINS"}
+MANAGED_SETTINGS.update(PATH_SETTINGS)
+MANAGED_SETTINGS.update(STATIC_ONLY_SETTINGS)
+FORBIDDEN_ENV = MANAGED_SETTINGS - {"TMPDIR"} | {"XCODE_XCCONFIG_FILE", "TOOLCHAINS"} | SIGNING_ENV_SETTINGS
 TEST_ONLY_OPTIONS = {
     "-testPlan", "-enableCodeCoverage", "-testLanguage", "-testRegion",
     "-parallel-testing-enabled", "-parallel-testing-worker-count", "-maximum-parallel-testing-workers",
@@ -56,6 +58,13 @@ class Plan:
     directories: tuple[Path, ...]
     run_id: str
     project_storage: Path
+    graph: object | None = None
+    settings_command: tuple[str, ...] = ()
+    unique_outputs: tuple[str, ...] = ("receipt", "result_bundle")
+    source_identity: Path | None = None
+    inputs: dict[str, Path] = field(default_factory=dict)
+    input_hashes: dict[str, str] = field(default_factory=dict)
+    member_settings_commands: tuple[tuple[str, ...], ...] = ()
 
 
 def parse_arguments(arguments: list[str], project_root: Path) -> tuple[str, list[str], Path]:
@@ -68,9 +77,9 @@ def parse_arguments(arguments: list[str], project_root: Path) -> tuple[str, list
         arg = arguments[at]
         if not arg or has_control_characters(arg):
             raise BuildHarborError("Empty arguments and control characters are not supported.")
-        if arg in {"build", "test"}:
+        if arg in {"build", "test", "archive"}:
             if action is not None:
-                raise BuildHarborError("Choose exactly one action: build or test.")
+                raise BuildHarborError("Choose exactly one action: build, test, or archive.")
             action = arg
             normalized.append(arg)
         elif arg in VALUE_OPTIONS:
@@ -113,48 +122,41 @@ def parse_arguments(arguments: list[str], project_root: Path) -> tuple[str, list
             if key in seen:
                 raise BuildHarborError("Duplicate build setting.")
             if key not in BOOLEAN_SETTINGS or value not in {"YES", "NO"}:
-                raise BuildHarborError("Unsupported or conflicting build setting. Version 0.1 accepts only documented boolean settings.")
+                raise BuildHarborError("Unsupported or conflicting build setting. Only documented boolean settings are accepted.")
             seen.add(key)
             normalized.append(arg)
         else:
             # Do not reflect arbitrary arguments: they may contain credentials.
-            raise BuildHarborError("Unsupported action or option. Only build/test and the documented argument list are supported; output paths are managed by BuildHarbor.")
+            raise BuildHarborError("Unsupported action or option. Use a documented build/test/archive command; output paths are managed by BuildHarbor.")
         at += 1
     if action is None:
-        raise BuildHarborError("Specify exactly one action: build or test.")
-    if "-project" not in selections:
-        raise BuildHarborError("An explicit -project is required. Workspaces are not supported in version 0.1.")
+        raise BuildHarborError("Specify exactly one action: build, test, or archive.")
+    if ("-project" in selections) == ("-workspace" in selections):
+        raise BuildHarborError("Choose exactly one explicit -project or -workspace.")
     if "-scheme" not in selections:
         raise BuildHarborError("An explicit -scheme is required.")
     if action != "test" and (seen & TEST_ONLY_OPTIONS or any(a.startswith(("-only-testing:", "-skip-testing:")) for a in seen)):
         raise BuildHarborError("Test-only options require the test action.")
-    identity = Path(selections["-project"])
+    identity = Path(selections.get("-project", selections.get("-workspace")))
     return action, normalized, identity
-
-
-def _inspect_project(identity: Path) -> None:
-    """Catch plain project output overrides; this is not an effective-settings parser."""
-    try:
-        text = (identity / "project.pbxproj").read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as exc:
-        raise BuildHarborError("Cannot read the selected project.pbxproj.") from exc
-    # Keep comments: comment markers inside quoted strings must never hide settings.
-    # Conservative false positives are preferable to an incomplete OpenStep parser.
-    for key in MANAGED_SETTINGS:
-        if re.search(r'(?:^|[;{\s])"?' + re.escape(key) + r'(?:\[[^\]]*\])?"?\s*=', text):
-            raise BuildHarborError(f"The project explicitly sets {key}. Review and remove this output/compiler override before using version 0.1.")
-    if re.search(r"\bbaseConfigurationReference\s*=", text):
-        raise BuildHarborError("Project xcconfig overrides require an effective-settings review and are not supported in version 0.1.")
-    if "wrapper.pb-project" in text or re.search(r'\bpath\s*=\s*[^;]*\.xcodeproj', text):
-        raise BuildHarborError("Nested project references require a settings review and are not supported in version 0.1.")
 
 
 def make_plan(config: Config, arguments: list[str], environment: dict[str, str] | None = None) -> Plan:
     env = os.environ if environment is None else environment
+    if arguments and arguments[0] == "-exportArchive":
+        return make_export_plan(config, arguments, env)
     action, normalized, identity = parse_arguments(arguments, config.project_root)
     if any(env.get(key) for key in FORBIDDEN_ENV):
         raise BuildHarborError("The environment contains output/compiler overrides or XCODE_XCCONFIG_FILE/TOOLCHAINS. Unset them before planning.")
-    _inspect_project(identity)
+    from .projects import inspect_projects
+    graph = inspect_projects(identity, config.project_root, MANAGED_SETTINGS)
+    scheme = normalized[normalized.index("-scheme") + 1]
+    if Path(scheme).name != scheme or scheme in {".", ".."}:
+        raise BuildHarborError("The selected scheme must be a literal shared scheme name.")
+    if any(graph.targets.values()) and not any(Path(path).name == scheme + ".xcscheme" for path in graph.fingerprints):
+        raise BuildHarborError("Select a statically inspected shared scheme. User and autogenerated schemes are unsupported.")
+    if len(graph.projects) > 1 and not {"-configuration", "-sdk"}.issubset(normalized):
+        raise BuildHarborError("Workspace and nested-project runs require explicit -configuration and -sdk for every member's settings inspection.")
     xcode = inspect_xcode(env)
     volume = inspect_volume(config)
     # Each checkout and Xcode distribution gets its own reusable build directories.
@@ -169,21 +171,34 @@ def make_plan(config: Config, arguments: list[str], environment: dict[str, str] 
         "module_cache": storage / "ModuleCache.noindex",
         "compilation_cache": storage / "CompilationCache.noindex",
         "precompiled_headers": storage / "PrecompiledHeaders",
+        "cache_root": storage / "Cache",
+        "sdk_stat_cache": storage / "SDKStatCaches.noindex",
         "temporary": storage / "Temporary",
         "receipt": storage / "Receipts" / f"{run_id}.json",
         "result_bundle": storage / "Results" / f"{run_id}.xcresult",
+        "settings_result_bundle": storage / "Results" / f"{run_id}-settings.xcresult",
     }
+    if action == "archive":
+        outputs["archive"] = storage / "Archives" / f"{run_id}.xcarchive"
+        archive_work = outputs["derived_data"] / "Build/Intermediates.noindex/ArchiveIntermediates" / scheme
+        outputs["archive_staging"] = archive_work / "InstallationBuildProductsLocation"
+        outputs["archive_products"] = archive_work / "BuildProductsPath"
+        outputs["archive_intermediates"] = archive_work / "IntermediateBuildFilesPath"
+    if len(graph.projects) > 1:
+        for index in range(len(graph.projects)):
+            outputs[f"member_settings_result_{index}"] = storage / "Results" / f"{run_id}-member-{index}.xcresult"
+    unique = tuple(name for name in outputs if name in {"receipt", "result_bundle", "settings_result_bundle", "archive"} or name.startswith("member_settings_result_"))
     for path in outputs.values():
         validate_destination(path, config, volume)
-    directories = tuple(path.parent if name in {"receipt", "result_bundle"} else path for name, path in outputs.items())
+    directories = tuple(dict.fromkeys(path.parent if name in unique else path for name, path in outputs.items()))
     for directory in directories:
         if directory.exists() and not directory.is_dir():
             raise BuildHarborError("A planned output directory is occupied by a file.")
-    for name in ("receipt", "result_bundle"):
+    for name in unique:
         if name in outputs and outputs[name].exists():
             raise BuildHarborError("A supposedly unique run output already exists.")
     command = [str(xcode.executable), *normalized, "-hideShellScriptEnvironment"]
-    for flag, name in (("-derivedDataPath", "derived_data"), ("-clonedSourcePackagesDirPath", "package_clones"), ("-packageCachePath", "package_cache"), ("-resultBundlePath", "result_bundle")):
+    for flag, name in (("-derivedDataPath", "derived_data"), ("-clonedSourcePackagesDirPath", "package_clones"), ("-packageCachePath", "package_cache"), ("-resultBundlePath", "result_bundle"), ("-archivePath", "archive")):
         if name in outputs:
             command.extend((flag, str(outputs[name])))
     settings = {
@@ -191,10 +206,73 @@ def make_plan(config: Config, arguments: list[str], environment: dict[str, str] 
         "OBJROOT": outputs["derived_data"] / "Build/Intermediates.noindex",
         "DSTROOT": storage / "Install",
         "SHARED_PRECOMPS_DIR": outputs["precompiled_headers"],
+        "CACHE_ROOT": outputs["cache_root"],
+        "CCHROOT": outputs["cache_root"],
+        "SDK_STAT_CACHE_DIR": outputs["sdk_stat_cache"],
         "MODULE_CACHE_DIR": outputs["module_cache"],
         "CLANG_MODULE_CACHE_PATH": outputs["module_cache"],
         "COMPILATION_CACHE_CAS_PATH": outputs["compilation_cache"],
     }
+    if action == "archive":
+        # Archive packaging expects Xcode's action-specific directory structure.
+        # Let -derivedDataPath establish it, then check every resolved root before
+        # the archive action. Generic build roots break Xcode's packaging step.
+        for key in ("SYMROOT", "OBJROOT", "DSTROOT"):
+            settings.pop(key)
     command.extend(f"{key}={value}" for key, value in settings.items())
     changes = {"DEVELOPER_DIR": str(xcode.developer_dir), "TMPDIR": str(outputs["temporary"]) + "/"}
-    return Plan(config, volume, xcode, action, tuple(command), changes, outputs, directories, run_id, storage)
+    query = command.copy()
+    query[query.index("-resultBundlePath") + 1] = str(outputs["settings_result_bundle"])
+    query.extend(("-showBuildSettings", "-json"))
+    members = []
+    if len(graph.projects) > 1:
+        for index, member in enumerate(graph.projects):
+            member_query = [str(xcode.executable), "-project", str(member), "-alltargets"]
+            for flag in ("-configuration", "-sdk", "-arch", "-jobs"):
+                if flag in normalized:
+                    member_query.extend((flag, normalized[normalized.index(flag) + 1]))
+            member_query.extend(a for a in normalized if a in SWITCH_OPTIONS or "=" in a and a.split("=", 1)[0] in BOOLEAN_SETTINGS)
+            for flag, name in (("-clonedSourcePackagesDirPath", "package_clones"), ("-packageCachePath", "package_cache"), ("-resultBundlePath", f"member_settings_result_{index}")):
+                member_query.extend((flag, str(outputs[name])))
+            member_query.extend(f"{key}={value}" for key, value in settings.items())
+            if action == "archive":
+                member_query.extend(f"{key}={outputs[name]}" for key, name in (("SYMROOT", "archive_products"), ("OBJROOT", "archive_intermediates"), ("DSTROOT", "archive_staging")))
+            member_query.extend((action, "-showBuildSettings", "-json", "-hideShellScriptEnvironment"))
+            members.append(tuple(member_query))
+    return Plan(config, volume, xcode, action, tuple(command), changes, outputs, directories, run_id, storage,
+                graph=graph, settings_command=tuple(query), unique_outputs=unique, source_identity=identity,
+                member_settings_commands=tuple(members))
+
+
+def make_export_plan(config: Config, arguments: list[str], env: dict[str, str]) -> Plan:
+    """Only local Copy App export of a successful, unchanged managed archive."""
+    from .artifacts import inspect_archive_input
+    if len(arguments) != 3 or arguments[:2] != ["-exportArchive", "-archivePath"]:
+        raise BuildHarborError("Use -exportArchive -archivePath ARCHIVE. Local mac-application export options and its output path are managed by BuildHarbor.")
+    if any(env.get(key) for key in FORBIDDEN_ENV):
+        raise BuildHarborError("Unset inherited output/compiler overrides before exporting.")
+    if has_control_characters(arguments[2]):
+        raise BuildHarborError("Archive paths cannot contain control characters.")
+    archive = Path(arguments[2])
+    xcode, volume = inspect_xcode(env), inspect_volume(config)
+    storage, identity, receipt, fingerprint, receipt_hash = inspect_archive_input(archive, config, volume, xcode)
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex
+    outputs = {"export": storage / "Exports" / run_id,
+               "export_options": storage / "ExportOptions" / f"{run_id}.plist",
+               "receipt": storage / "Receipts" / f"{run_id}.json",
+               "temporary": storage / "Temporary"}
+    unique = ("export", "export_options", "receipt")
+    for name, path in outputs.items():
+        validate_destination(path, config, volume)
+        if name in unique and path.exists():
+            raise BuildHarborError("A unique export output already exists; no output will be overwritten.")
+        if name not in unique and path.exists() and not path.is_dir():
+            raise BuildHarborError("An export directory is occupied by a file.")
+    directories = tuple(dict.fromkeys(path.parent if name in unique else path for name, path in outputs.items()))
+    command = (str(xcode.executable), "-exportArchive", "-archivePath", str(archive),
+               "-exportPath", str(outputs["export"]), "-exportOptionsPlist", str(outputs["export_options"]))
+    environment = {"DEVELOPER_DIR": str(xcode.developer_dir), "TMPDIR": str(outputs["temporary"]) + "/"}
+    return Plan(config, volume, xcode, "export", command, environment, outputs, directories, run_id, storage,
+                unique_outputs=unique, source_identity=identity,
+                inputs={"archive": archive, "archive_receipt": receipt},
+                input_hashes={"archive": fingerprint, "archive_receipt": receipt_hash})
