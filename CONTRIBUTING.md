@@ -2,19 +2,19 @@
 
 Thank you for helping make BuildHarbor safer and easier to understand. The useful contributions here are usually small and specific: one guard case, one clearer diagnostic, one verified toolchain fixture, or one documentation correction.
 
-BuildHarbor 0.1.0 has a deliberately limited published contract: `doctor`, read-only `plan`, and guarded `run` for explicit command-line builds and tests. The validated 0.2 development checkpoint adds restrictive project/workspace traversal, effective-setting checks, local macOS archives, and local Copy App exports. The current local 0.3 work adds bounded, read-only storage reporting. Its controlled report fixture and 117-test suite on Python 3.11.13 and 3.13.4 have passed, along with the final archive/export regression and clean installation. Neither development line has been published. Cleanup, migration, global Xcode settings, GUI Xcode behavior, background services, and general filesystem sandboxing remain outside the project scope.
+BuildHarbor 0.3.0 has a deliberately limited contract: read-only `doctor` and `plan`, guarded `run` for supported command-line build, test, archive, and export actions, and bounded read-only storage reporting. The workspace, archive, and export work reached an internal 0.2 checkpoint but was not released separately; it is delivered with 0.3.0. Cleanup, migration, global Xcode settings, GUI Xcode behavior, background services, and general filesystem sandboxing remain outside the project scope.
 
 ## Before changing code
 
 Read the README for the canonical setup and verification commands. Check the roadmap and open issues before expanding scope. For a security problem, follow [SECURITY.md](SECURITY.md) instead of opening a public issue with exploit details.
 
-The runtime baseline is Python 3.11 or newer and the runtime uses only the Python standard library. Please discuss a new runtime dependency before building work around it. The allowlist accepts exactly Xcode 27.0 (build 27A266a). On Apple Silicon with macOS 27.0 (26A428), the published 0.1 fixtures completed guarded build and test runs, including a loopback HTTP Git dependency that exercised the routed checkout and repository cache. The current 0.2 fixtures have also completed one local build/test/workspace/archive/export sequence, with strict verification of the exported ad-hoc application, while 94 automated tests passed under Python 3.11.13 and 3.13.4. Read the [0.1 verification record](docs/verification.md) and [0.2 development record](docs/verification-0.2.md) before making a compatibility claim. None of this establishes another Xcode build, another project shape, another host architecture, real signing/distribution, or global manifest and metadata cache routing.
+The runtime baseline is Python 3.11 or newer and the runtime uses only the Python standard library. Please discuss a new runtime dependency before building work around it. The allowlist accepts exactly Xcode 27.0 (build 27A266a). On Apple Silicon with macOS 27.0 (26A428), controlled fixtures completed build, test, a two-member workspace build, archive, local Copy App export, and storage reporting. A loopback HTTP Git dependency exercised the routed checkout and repository cache. The full 117-test suite passed under Python 3.11.13 and 3.13.4. An isolated installation of the committed candidate revision also passed before release preparation; this is not evidence of a fresh installation from the final tag. Read the [0.1 verification record](docs/verification.md), [0.2 development record](docs/verification-0.2.md), and [0.3 verification record](docs/verification-0.3.md) before making a compatibility claim. None of this establishes another Xcode build, another project shape, another host architecture, real signing/distribution, or global manifest and metadata cache routing.
 
 ## Configuration boundaries
 
 Keep portable project intent in `buildharbor.toml`. Keep the machine-specific mount, volume UUID, and storage root in `.buildharbor.local.toml`, which must remain ignored by Git.
 
-Examples and fixtures must use obviously fake paths and UUIDs. Do not commit personal usernames, real external-volume identifiers, signing material, build logs containing secrets, or private project names. A report or receipt can expose paths and command arguments, so redact it before attaching it to an issue.
+Examples and fixtures must use obviously fake paths and UUIDs. Do not commit personal usernames, real external-volume identifiers, signing material, build logs containing secrets, or private project names. A report or receipt can expose paths, command arguments, and configured project IDs. Treat those IDs as potentially sensitive and redact them before attaching output to an issue.
 
 ## Change expectations
 
@@ -24,7 +24,7 @@ Examples and fixtures must use obviously fake paths and UUIDs. Do not commit per
 - Treat managed output flags, managed build settings, and `-xcconfig` as conflicts rather than allowing a caller to bypass routing.
 - Keep effective-setting inspection inside guarded `run`. The selected scheme/action query and every static member query must agree with the inspected graph and resolve managed output paths beneath the verified storage root.
 - Preserve the fail-closed project surface. Shared schemes, known object types, inspectable copy phases, and source graphs that can be traversed completely are required. Script phases, custom rules, private schemes, and unresolved members remain unsupported.
-- Keep `.xctestplan` files, `TestPlanReference` scheme entries, and `-testPlan` rejected until their complete input graph can be inspected and guarded.
+- Keep shared-scheme test-plan selections (`TestPlans` and `TestPlanReference`) and `-testPlan` rejected until their complete input graph can be inspected and guarded.
 - Keep archive signing local and non-credentialed: signing disabled or manual ad-hoc identity `-`, one simple macOS application, and no keychain, team, profile, extra signing flags, or private certificate identity.
 - Keep export options generated by BuildHarbor. Export must stay bound to a successful, unchanged managed archive and use unique output paths; symlinks, hard-linked files, special files, and ambiguous application contents must block it.
 - Keep command execution argument-based. Do not add shell interpretation for convenience.
@@ -48,9 +48,9 @@ python3 scripts/check_publication.py
 
 The publication check looks for local configuration, private paths, credential patterns, generated outputs, and other files that should not be published. Its success still requires a manual review before publication.
 
-Read the [0.3 verification record](docs/verification-0.3.md) before making a reporting or release-readiness claim. It separates the controlled fixture and automated-suite evidence from checks that remain open.
+Read the [0.3 verification record](docs/verification-0.3.md) before making a reporting or release-readiness claim. It separates controlled fixture, automated-suite, installation, CI, and publication evidence.
 
-Local development may continue through the planned 0.3 work, but a new public release has a separate gate. The complete CI matrix must pass from a clean checkout, controlled live integration evidence must match every claimed 0.2 behavior, and the documentation must identify anything that remains unverified. A local milestone or version change is not release evidence.
+Every public release has a separate gate. The complete CI matrix must pass from a clean checkout, controlled live integration evidence must match the claimed behavior, and the documentation must identify anything that remains unverified. A local milestone or version change is not release evidence.
 
 ## Pull requests
 

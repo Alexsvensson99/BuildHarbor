@@ -1,8 +1,8 @@
 # ADR 0003: Report managed storage with conservative inode attribution
 
-- Status: Accepted for 0.3 development; controlled fixtures and clean installation passed; public release pending
+- Status: Accepted in BuildHarbor 0.3.0
 - Date: 2026-10-04
-- Applies to: BuildHarbor 0.3 development line
+- Applies to: BuildHarbor 0.3.0
 
 ## Context
 
@@ -14,7 +14,7 @@ Reporting must remain separate from cleanup. It must not create a missing storag
 
 ### Command and configuration boundary
 
-The development command is:
+The command is:
 
 ```text
 buildharbor report [--project-dir DIR ...] [--json]
@@ -77,7 +77,7 @@ The command does not suggest that large buckets are safe to delete and does not 
 
 One controlled real-storage fixture completed on the configured external APFS volume. It reconciled four unique regular files: one project-owned, one shared across known projects, and two unattributed. The fixture reported 97 logical bytes and 16,384 allocated bytes, ignored one symlink, and returned complete status. Separate cases verified a safely absent root and an incomplete lower-bound result. The checked fixture metadata and content remained unchanged.
 
-A live scan of BuildHarbor's own managed root also returned complete status with no issues. Its transient local totals are intentionally not a public compatibility claim. All 117 unit/process tests pass under Python 3.11.13 and 3.13.4. The final archive/export regression, clean installation, publication check, and local privacy review also passed. The new GitHub Actions matrix and public release remain open. [The 0.3 verification record](../verification-0.3.md) separates completed and pending evidence, and no 0.3 release has been published.
+A live scan of BuildHarbor's own managed root also returned complete status with no issues. Its transient local totals are intentionally not a public compatibility claim. All 117 unit/process tests passed under Python 3.11.13 and 3.13.4. The final archive/export regression, publication check, and local privacy review also passed. An isolated installation of the committed candidate revision passed before release preparation; that result is not a fresh installation from the final tag. [The 0.3 verification record](../verification-0.3.md) keeps local, CI, and publication evidence separate.
 
 ## Alternatives considered
 

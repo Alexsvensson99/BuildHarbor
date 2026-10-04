@@ -1,5 +1,7 @@
 # Version 0.2 development verification
 
+This is the historical internal checkpoint. Version 0.2 was not released separately; its implementation is included in 0.3.0. See the [0.3 verification record](verification-0.3.md) for subsequent checks and release gates.
+
 Version 0.2 was exercised locally on **Apple Silicon (arm64), macOS 27.0 (26A428), Xcode 27.0 (27A266a)**. The automated unit/process suite passed under **Python 3.11.13** and **Python 3.13.4**. This record describes a development milestone on 2026-10-04. Version 0.2 has not run its new-branch GitHub CI gate and has not been published as a release.
 
 The private raw logs, receipts, generated results, and source copies remain on the approved external APFS volume. This public record omits their absolute paths, local volume identity, and run UUIDs.

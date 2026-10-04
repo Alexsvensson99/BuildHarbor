@@ -1,8 +1,8 @@
 # BuildHarbor roadmap
 
-BuildHarbor starts deliberately narrow: it routes explicit command-line Apple builds and tests to one verified external APFS volume. It does not change Xcode's global settings, migrate existing data, clean caches, run in the background, or make the build process a filesystem sandbox.
+BuildHarbor remains deliberately narrow. Version 0.3.0 routes supported command-line Apple builds, tests, archives, and local Copy App exports to one verified external APFS volume. It can also report managed storage without changing it. It does not change Xcode's global settings, migrate existing data, clean caches, run in the background, or make the build process a filesystem sandbox.
 
-The runtime baseline is Python 3.11 or newer using only the standard library. The initial toolchain allowlist accepts exactly Xcode 27.0 (build 27A266a). On Apple Silicon with macOS 27.0 (26A428), the repository fixtures have completed guarded build and test runs and an HTTP Git dependency has populated the routed checkout and repository cache. A repeated build reused the checked compiler artifacts. [The verification record](docs/verification.md) states the exact environment and limits. Automated tests still simulate volume inspection and build execution. Broader support requires its own evidence, and a nearby version number is not enough.
+The runtime baseline is Python 3.11 or newer using only the standard library. The toolchain allowlist accepts exactly Xcode 27.0 (build 27A266a). On Apple Silicon with macOS 27.0 (26A428), controlled fixtures have completed the supported build, test, workspace, archive, export, remote-package, cache-reuse, and storage-reporting paths. The full 117-test suite passed on Python 3.11.13 and 3.13.4. [The 0.3 verification record](docs/verification-0.3.md) states the exact environment and limits. Automated tests still simulate volume inspection and child execution. Broader support requires its own evidence, and a nearby version number is not enough.
 
 ## 0.1.0 — guarded build and test routing
 
@@ -35,9 +35,9 @@ The runtime baseline is Python 3.11 or newer using only the standard library. Th
 - Build and test fixtures cover spaces in paths and use fake volume identities. No personal mount path or real volume UUID is committed.
 - Documentation describes the limits above and does not imply GUI Xcode coverage, cleanup, migration, archive/export support, or filesystem isolation.
 
-## Release gate after 0.1
+## Release gates
 
-Development remains maintainer-led and uses controlled fixtures. Local implementation may continue through 0.2 and 0.3, but that progress does not authorize or prove a new public release. Before another release is published, one candidate revision needs a dated internal validation record that meets every gate below:
+Development remains maintainer-led and uses controlled fixtures. A milestone implementation does not by itself prove a public release. Each candidate revision needs a dated internal validation record that meets every applicable gate below:
 
 - the full automated suite passes on every supported CI environment;
 - the real Xcode fixture completes guarded build and test runs on each exact toolchain build claimed as supported;
@@ -48,18 +48,18 @@ Development remains maintainer-led and uses controlled fixtures. Local implement
 - a clean installation completes `--version`, `doctor`, and `plan` without changing source files or creating package bytecode; and
 - publication checks and manual review find no machine configuration, private paths, real volume UUIDs, credentials, or generated build output in publishable history.
 
-Any unresolved unsafe allow, managed output unexpectedly written to internal storage, child process started after a rejected guard, or failure to reproduce the supported Xcode integration blocks a new release. Other failures must be recorded with their scope and either resolved or explicitly removed from the supported claim. Local development can continue while the gate is open.
+Any unresolved unsafe allow, managed output unexpectedly written to internal storage, child process started after a rejected guard, or failure to reproduce the supported Xcode integration blocks a release. Other failures must be recorded with their scope and either resolved or explicitly removed from the supported claim. The 0.3.0 local candidate evidence is complete, including an isolated installation of the committed candidate revision. A fresh installation from the final tag requires the configured external volume and is a separate check; GitHub CI and publication state are recorded separately from local evidence.
 
-## 0.2 — archive/export and effective-setting conflicts
+## 0.2 — delivered in 0.3.0
 
-Status: the implementation and one controlled local build/test/workspace/archive/export sequence have passed on Xcode 27.0 (27A266a). A separate remote-package regression completed build, repeat build, and test with routed repository cache and selected compiler-artifact reuse. The 94-test unit/process suite passed under Python 3.11.13 and 3.13.4. [The 0.2 verification record](docs/verification-0.2.md) gives the exact boundary. New-release CI and review remain open, and version 0.2 has not been published.
+Status: implemented and locally verified, then included in 0.3.0. Version 0.2 was an internal checkpoint and was not published separately. One controlled build/test/workspace/archive/export sequence passed on Xcode 27.0 (27A266a). A separate remote-package regression completed build, repeat build, and test with routed repository cache and selected compiler-artifact reuse. [The 0.2 verification record](docs/verification-0.2.md) gives the exact checkpoint boundary; the [0.3 record](docs/verification-0.3.md) covers the combined release candidate.
 
 ### Scope
 
 - Keep `plan` strictly read-only. It performs bounded static traversal of a project or workspace, referenced projects, shared schemes, configurations, xcconfig source, phases, rules, package references, and managed settings without executing `xcodebuild`.
 - During `run`, inspect the selected scheme/action settings and every statically discovered project target before the requested action starts. The selected query uses the action's managed routes. Member `-alltargets` queries omit `-derivedDataPath` and instead use explicit output roots, package/cache routes, and external temporary storage.
 - Fail closed on private or autogenerated schemes, scripts, custom build rules, unsupported graph objects, unsafe copy phases, unresolved members, unknown targets, conflicting duplicates, unresolved output values, or managed paths outside the approved storage root.
-- Reject `.xctestplan` inputs, `TestPlanReference` scheme entries, and caller-supplied `-testPlan` until their complete input graph can be inspected.
+- Reject shared schemes that select test plans through `TestPlans` or `TestPlanReference`, and caller-supplied `-testPlan`, until their complete input graph can be inspected.
 - Add a narrow archive operation for exactly one simple macOS application with signing disabled or manual ad-hoc signing using identity `-`. Reject teams, profiles, keychains, extra signing flags, private identities, and other platforms or archive shapes.
 - Derive archive packaging roots from the managed external Derived Data action layout and check the resolved effective values. Do not claim that generic root-setting injection works for archives.
 - Add a narrow local Copy App export that accepts only a successful, unchanged BuildHarbor-managed archive, generates fixed `mac-application` / `export` options, and allocates unique outputs. Reject archive symlinks, hard-linked files, special files, cross-filesystem entries, and ambiguous app contents.
@@ -68,7 +68,7 @@ Status: the implementation and one controlled local build/test/workspace/archive
 
 ### Dependencies
 
-- The release gate above must pass before a new public release. It does not block local 0.2 or 0.3 implementation.
+- The release gate above applies to the combined 0.3.0 candidate.
 - Stable 0.1 configuration and receipt schemas.
 - Primary-source and executable evidence for every newly managed archive/export flag and effective setting.
 - Controlled fixtures covering workspace membership, nested project references, all static member targets, signing failures, archive contents, export binding, and conflicts in non-root projects.
@@ -82,11 +82,11 @@ Status: the implementation and one controlled local build/test/workspace/archive
 - Archive success requires an inspected single macOS application and a receipt-bound digest. Export requires that successful receipt and unchanged archive; neither operation accepts signing credentials.
 - Successful archives and exports remain beneath the approved storage root and are represented accurately in schema-1 receipts.
 - Existing 0.1 configuration files retain their meaning. Additive schema-1 receipt fields do not invalidate existing readers that ignore unknown fields.
-- The controlled local milestone is recorded with its exact environment and limits. The complete new-release CI and review gates pass before any 0.2 release claim.
+- The controlled local milestone is recorded with its exact environment and limits. Version 0.2 was not released separately.
 
-## 0.3 — read-only storage reporting
+## 0.3.0 — read-only storage reporting
 
-Status: implemented in the current local checkout. A controlled real-storage fixture passed with reconciled project, shared, unattributed, absent-root, and incomplete outcomes while preserving the checked content and metadata. All 117 unit/process tests pass under Python 3.11.13 and 3.13.4. The final archive/export regression and clean installation also passed. [The 0.3 verification record](docs/verification-0.3.md) separates completed and open evidence. No 0.3 release has been published.
+Status: implemented and locally verified for version 0.3.0. A controlled real-storage fixture passed with reconciled project, shared, unattributed, absent-root, and incomplete outcomes while preserving the checked content and metadata. All 117 unit/process tests passed under Python 3.11.13 and 3.13.4. The final archive/export regression and an isolated installation of the committed candidate revision also passed. [The 0.3 verification record](docs/verification-0.3.md) separates local evidence from CI and publication state.
 
 ### Scope
 
@@ -116,7 +116,7 @@ Status: implemented in the current local checkout. A controlled real-storage fix
 - An absent storage root on a successfully verified volume is a complete empty report and is not created. An unavailable or unverifiable volume is incomplete.
 - Reporting works without Xcode and accepts a read-only or low-capacity correctly identified volume, while rejecting the wrong UUID, internal/non-APFS device, locked volume, and missing read/traverse access.
 - The scanner performs no content reads or intentional filesystem writes. Controlled tests preserve content, mode, modification time, and change time; access time is excluded because the operating system may update it when metadata descriptors are opened.
-- Final controlled fixture, clean-install, dual-Python, publication, and privacy checks pass before any 0.3 release claim.
+- The controlled fixture, candidate-install, dual-Python, publication, and privacy checks are recorded separately so a local result cannot be mistaken for CI or publication evidence.
 
 ## 1.0 — stable contracts
 

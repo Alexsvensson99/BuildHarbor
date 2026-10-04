@@ -1,6 +1,6 @@
-# Version 0.3 development verification
+# Version 0.3 verification
 
-Version 0.3 is implemented locally. This record covers the 2026-10-04 checks on Apple Silicon (arm64), macOS 27.0 (26A428), and Xcode 27.0 (27A266a). The public release remains 0.1.0. Neither 0.2 nor 0.3 has been tagged, pushed, or published as a new release, and the new GitHub Actions matrix has not run.
+This record covers the local 2026-10-04 checks for version 0.3.0 on Apple Silicon (arm64), macOS 27.0 (26A428), and Xcode 27.0 (27A266a). These checks finished before the release was published. Version 0.2 was an internal development checkpoint; its features are included in 0.3.0. CI and publication are separate gates from the local evidence below.
 
 ## Automated checks
 
@@ -50,17 +50,21 @@ The isolated installation check passed from local candidate revision `42712e097f
 
 Private evidence set `install-6b190939f2af426396fc6d767911f8b3` records exit 0 for `--version`, `doctor`, `plan`, and `report`. Doctor was ready for planning; the build plan correctly left effective settings pending until a guarded run; the storage report was complete. The check did not execute Xcode or a build action.
 
-Snapshots matched all 154 source-tree entries and 16 installed-package entries before and after those commands. Contents, modes, modification times, and change times were unchanged; no package bytecode was present before or after. Access times were excluded. Subsequent changes to this candidate only finalize documentation and the verification record.
+Snapshots matched all 154 source-tree entries and 16 installed-package entries before and after those commands. Contents, modes, modification times, and change times were unchanged; no package bytecode was present before or after. Access times were excluded.
+
+Release preparation also compares the runtime, tests, fixtures, verification scripts, package metadata, examples, and configuration policy against that installed revision. Those files are unchanged; release preparation changes documentation and the CI trigger only. The existing successful local installation remains the SSD execution evidence. It is not repeated during publication when the external volume is unavailable, and no internal-storage fallback is used. CI performs fresh package installations for the final revision, and the downloadable tag archive is compared with its Git tree before the release is published.
 
 ## Final review
 
-The publication checker passed for all 81 publishable files and reachable Git history. Manual review kept local configuration, private paths, real volume UUIDs, credentials, generated output, and raw logs outside that history. Relative documentation links and whitespace checks passed.
+The publication checker passed for all publishable files and reachable Git history. Manual review kept local configuration, private paths, real volume UUIDs, credentials, generated output, and raw logs outside that history. Relative documentation links and whitespace checks passed.
 
 A bounded read-only diagnostic review covered 2026-10-04 02:27:00–02:56:35 UTC, after the Xcode runs had finished. It parsed one recent diagnostic file and found no matching Harbor, XCTest, xcodebuild, Swift, or Clang reports, with no inventory warnings. No diagnostic files were removed or modified. This is a time- and process-scoped observation, not a general machine-health claim.
 
-## Remaining release work
+## Release gates and remaining limits
 
-The local checks do not replace the complete GitHub Actions matrix, a review of the final public candidate, or a separate release decision. No external developer program has started. Broader project shapes, other Xcode distributions, real signing/distribution, GUI Xcode, and complete filesystem isolation remain outside the verified claim.
+Publication requires the complete GitHub Actions matrix to pass for the exact release revision, a review of the final public candidate, and an approved release decision. The [CI workflow](https://github.com/Alexsvensson99/BuildHarbor/actions/workflows/ci.yml) checks package installation, simulated-system/process tests, installed command help, and publishable files on Linux/Python 3.11 and macOS/Python 3.13. A release tag points to the already checked revision; it does not rerun identical CI jobs. The [0.3.0 release](https://github.com/Alexsvensson99/BuildHarbor/releases/tag/v0.3.0) carries the final CI and publication evidence.
+
+No external developer program has started. Broader project shapes, other Xcode distributions, real signing/distribution, GUI Xcode, and complete filesystem isolation remain outside the verified claim.
 
 Repeat the report check only when needed, after configuring the ignored local volume file:
 

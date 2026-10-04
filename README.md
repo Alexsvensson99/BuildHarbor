@@ -1,176 +1,164 @@
 # BuildHarbor
 
-BuildHarbor checks an external APFS volume before routing selected Xcode build outputs to it. The published 0.1.0 release supports guarded command-line builds and tests. The validated 0.2 development checkpoint adds effective-setting checks, restrictive workspace traversal, local archives, and local Copy App exports. The current local 0.3 work adds bounded, read-only storage reporting.
+BuildHarbor checks an external APFS volume before routing selected command-line Xcode output to it. Version 0.3.0 supports guarded build, test, archive, and local Copy App export; bounded project/workspace inspection; and read-only reporting for managed storage.
 
-I want an external build drive to be an explicit part of the workflow. A path under `/Volumes` is not enough: the expected disk needs to be mounted, unlocked, writable, and identified by its volume UUID. If those checks fail, BuildHarbor stops before launching the build.
+I want an external build drive to be an explicit part of the workflow. A path under `/Volumes` is not enough: the expected disk must be mounted, unlocked, and identified by its volume UUID. Build actions also require writable storage and the configured free capacity. If those checks fail, BuildHarbor does not silently fall back to internal storage.
 
-The intended audience is independent Apple developers and small teams using command-line builds, including builds started by coding agents. For now, I am focusing on my own controlled projects and internal validation. It is too early to invite other developers to use it.
+BuildHarbor is still intentionally narrow. I use it with controlled projects and fixtures; there has been no external developer program or broad compatibility validation. It is a storage guard and reviewable command workflow, not a filesystem sandbox.
 
-BuildHarbor uses Python 3.11 or later and has no third-party runtime dependencies. The source is MIT licensed.
+The runtime is Python 3.11 or later with no third-party runtime dependencies. The source is MIT licensed.
 
 ## Requirements and installation
 
 - macOS. `doctor`, `plan`, and `run` need a full Xcode installation selected through `xcode-select` or `DEVELOPER_DIR`; `report` does not require Xcode.
-- **Xcode 27.0, build 27A266a** for build/test/archive/export workflows. Both the published release and the current development line accept only this exact distribution. Other versions need their own integration evidence before support is added.
+- **Xcode 27.0, build 27A266a** for build, test, archive, and export. No adjacent Xcode version is implied.
 - Python **3.11+**, `pip`, and Git.
-- A mounted, unlocked **external APFS** volume. Build/test/archive/export require it to be writable and above the configured capacity threshold. Reporting requires read/traverse access but permits a read-only or low-capacity volume.
+- A mounted, unlocked **external APFS** volume. Build actions require write access and the configured free capacity. Reporting needs read/traverse access but permits a read-only or low-capacity volume.
 
-Install the published 0.1.0 release in a virtual environment:
+Install version 0.3.0 from its GitHub tag in a virtual environment:
 
 ```sh
-git clone --branch v0.1.0 --depth 1 https://github.com/Alexsvensson99/BuildHarbor.git
+git clone --branch v0.3.0 --depth 1 https://github.com/Alexsvensson99/BuildHarbor.git
 cd BuildHarbor
 python3 -m venv .venv
 .venv/bin/python -m pip install .
 .venv/bin/buildharbor --version
 ```
 
-Use `.venv/bin/buildharbor` in the examples below, or activate the environment with `source .venv/bin/activate`. This release is distributed through GitHub; it is not published to PyPI or Homebrew. Installing the source uses setuptools as a build dependency.
+Use `.venv/bin/buildharbor` below, or activate the environment with `source .venv/bin/activate`. BuildHarbor is distributed through GitHub; it is not published to PyPI, Homebrew, or another registry. Installing the source uses setuptools as a build dependency.
 
-## Current development status
+## Configure a project
 
-Version 0.2 is implemented on the development branch and has completed one controlled local sequence on Xcode 27.0 (27A266a): build, test, a workspace build covering two member projects, archive, and export. The exported application passed strict code-signature verification as ad-hoc with no team identifier, and the sequence did not launch Xcode's GUI. The 94-test unit/process suite also passed under Python 3.11.13 and 3.13.4. This is local development evidence; version 0.2 has not passed its new-release CI gate and has not been published as a GitHub release. [The 0.2 verification record](docs/verification-0.2.md) gives the exact evidence and remaining limits.
-
-Version 0.3 reporting is implemented in the current local checkout. A controlled real-storage fixture has passed with project, shared, unattributed, absent-root, and incomplete outcomes while preserving the checked content and metadata. All 117 unit/process tests pass under Python 3.11.13 and 3.13.4. The final guarded archive/export regression and a clean installation of the committed 0.3.0 candidate also passed. Version 0.3 is not part of the published 0.1.0 install and has not been released. [The 0.3 verification record](docs/verification-0.3.md) records the exact evidence and remaining release gates.
-
-The 0.2 command surface keeps `doctor`, `plan`, and `run`:
-
-- For build, test, and archive, `plan` parses the selected project or workspace, its shared scheme, referenced projects, configurations, phases, rules, package references, and managed settings. Export planning reads and fingerprints the managed archive and its receipt. Planning remains read-only and never starts `xcodebuild`.
-- For build, test, and archive, `run` repeats the static checks, takes the project lock, and runs a bounded `-showBuildSettings -json` query for the selected scheme and action. When the graph contains more than one project, it also queries every statically found project with `-alltargets`. A missing member, unexpected target, unresolved path, unsafe output setting, script phase, custom rule, or unsupported copy destination blocks the requested action.
-- The selected-scheme query uses the same managed Derived Data, package, compiler-cache, temporary, and result paths as the requested action. Member `-alltargets` queries omit `-derivedDataPath`, which is not a supported combination in the tested toolchain, and instead supply explicit managed output roots, package paths, cache settings, and `TMPDIR`.
-- `archive` is limited to one simple macOS application with signing disabled or manual ad-hoc signing using identity `-`. Teams, provisioning profiles, keychains, extra signing flags, and private certificate identities are rejected. BuildHarbor validates effective signing settings and structurally inspects the archive/application; it does not run `codesign` to audit the produced signature or team. The strict ad-hoc/no-team result above is controlled-fixture evidence.
-- `-exportArchive` accepts only a successful, unchanged BuildHarbor-managed archive. BuildHarbor generates a fixed local `mac-application` / `export` options plist and unique export directory. It rejects archive trees containing symlinks, hard-linked regular files, special files, or more than one application.
-
-The portable configuration and receipt format remain at `schema_version = 1`. Version 0.2 adds receipt fields for source identity, settings validation, inputs, and archive identity without changing the meaning of existing fields. See [ADR 0002](docs/adr/0002-effective-settings-and-local-export.md) for the complete decision and current limits.
-
-## Current local checkout examples
-
-These examples use unreleased 0.2/0.3 behavior from this source checkout. They do not work with the published 0.1.0 tag shown in the installation section. `-B` keeps Python bytecode out of the checkout.
-
-Plan and run the two-member workspace fixture:
-
-```sh
-PYTHONPATH=src python3 -B -m buildharbor plan -- \
-  -workspace fixtures/HarborWorkspace/HarborWorkspace.xcworkspace \
-  -scheme HarborWorkspace -configuration Debug -sdk macosx \
-  -destination 'platform=macOS' build
-PYTHONPATH=src python3 -B -m buildharbor run -- \
-  -workspace fixtures/HarborWorkspace/HarborWorkspace.xcworkspace \
-  -scheme HarborWorkspace -configuration Debug -sdk macosx \
-  -destination 'platform=macOS' build
-```
-
-Archive the simple macOS app, then export the exact managed archive path printed by the archive plan or receipt:
-
-```sh
-PYTHONPATH=src python3 -B -m buildharbor run -- \
-  -project fixtures/HarborApp/HarborApp.xcodeproj \
-  -scheme HarborApp -configuration Release \
-  -destination 'platform=macOS' archive
-PYTHONPATH=src python3 -B -m buildharbor plan -- \
-  -exportArchive -archivePath '/managed/path/from/archive-receipt.xcarchive'
-PYTHONPATH=src python3 -B -m buildharbor run -- \
-  -exportArchive -archivePath '/managed/path/from/archive-receipt.xcarchive'
-```
-
-Report the configured checkout's managed storage in text or JSON:
-
-```sh
-PYTHONPATH=src python3 -B -m buildharbor report
-PYTHONPATH=src python3 -B -m buildharbor report --json
-```
-
-To classify storage for several configured checkouts that share the exact same mount, volume UUID, and storage root, repeat `--project-dir`:
-
-```sh
-PYTHONPATH=src python3 -B -m buildharbor report \
-  --project-dir /path/to/project-a \
-  --project-dir /path/to/project-b
-```
-
-`report` does not require Xcode. It still requires readable project configuration and the correctly identified external APFS volume.
-
-## First run with the published 0.1.0 release
-
-The repository includes a small macOS framework and hostless XCTest fixture. It needs no simulator, signing account, or third-party package download.
-
-1. Inspect **your** disk with `diskutil info "/Volumes/Developer SSD"`. Replace the example disk name with its actual mount point. Copy the **Volume UUID**, not the disk/container UUID.
-2. Copy `examples/buildharbor.local.toml.example` to `.buildharbor.local.toml` in this checkout.
-3. Edit the copy with your mount point, volume UUID, and a storage directory below that mount. The directory may be missing; BuildHarbor creates it only when you run a build.
+1. Inspect your disk with `diskutil info "/Volumes/Developer SSD"`. Replace the example name with the real mount point and copy the **Volume UUID**, not the disk or container UUID.
+2. Copy `examples/buildharbor.local.toml.example` to `.buildharbor.local.toml` in the project root.
+3. Add `.buildharbor.local.toml` to that project's `.gitignore` and edit it with the local mount, UUID, and storage root.
 
 ```toml
-# .buildharbor.local.toml — private to this machine, ignored by Git
+# .buildharbor.local.toml — private to this machine
 schema_version = 1
 mount = "/Volumes/Developer SSD"
 volume_uuid = "REPLACE-WITH-YOUR-APFS-VOLUME-UUID"
 storage_root = "/Volumes/Developer SSD/BuildHarbor"
 ```
 
-Portable policy lives in `buildharbor.toml`, which you can commit:
+Portable policy stays in `buildharbor.toml` and may be committed:
 
 ```toml
 schema_version = 1
-project_id = "buildharbor-fixture"
-minimum_free_gib = 2
+project_id = "my-project"
+minimum_free_gib = 20
 ```
 
-Then run the complete workflow:
+Run `buildharbor doctor` first. It reads the configuration, volume identity and capacity, permission metadata, and selected Xcode without writing a probe.
+
+## Build and test
+
+`plan` is read-only. It parses the selected project or workspace and shared scheme, reads static Xcode application metadata, and prints the command, controlled environment, and planned outputs without executing `xcodebuild` or resolving packages. It is a preview: `run` validates again and allocates its own unique outputs.
 
 ```sh
-buildharbor doctor
-buildharbor plan -- -project fixtures/HarborFixture/HarborFixture.xcodeproj \
+buildharbor plan -- \
+  -project fixtures/HarborFixture/HarborFixture.xcodeproj \
   -scheme HarborFixture -destination 'platform=macOS' build
-buildharbor plan --json -- -project fixtures/HarborFixture/HarborFixture.xcodeproj \
-  -scheme HarborFixture -destination 'platform=macOS' test
-buildharbor run -- -project fixtures/HarborFixture/HarborFixture.xcodeproj \
+buildharbor run -- \
+  -project fixtures/HarborFixture/HarborFixture.xcodeproj \
   -scheme HarborFixture -destination 'platform=macOS' -jobs 2 build
-buildharbor run -- -project fixtures/HarborFixture/HarborFixture.xcodeproj \
-  -scheme HarborFixture -destination 'platform=macOS' -jobs 2 \
+buildharbor run -- \
+  -project fixtures/HarborFixture/HarborFixture.xcodeproj \
+  -scheme HarborFixture -destination 'platform=macOS' \
   -parallel-testing-enabled NO test
 ```
 
-For your own project, place both configuration files in its root and add `.buildharbor.local.toml` to **that project's** `.gitignore`. Keep the portable policy separate from the local file. Run the commands there, or use `buildharbor plan --project-dir /path/to/project -- ...`. Project arguments resolve relative to that directory.
+These commands use the repository-owned fixture. Substitute your own accepted project and shared scheme after configuring its checkout.
 
-## What each command does in the current local checkout
+For a workspace or nested graph with more than one project, provide explicit configuration and SDK values. BuildHarbor checks the selected scheme/action settings and every statically discovered member project before starting the requested action.
 
-**`doctor`** reads configuration, the mounted volume's UUID and APFS format, external-disk status, available capacity, permission metadata, and selected Xcode. It does not write a probe. “Permission metadata permits access” is not proof that a real write will succeed. `doctor --json` makes the same distinction.
+```sh
+buildharbor plan -- \
+  -workspace fixtures/HarborWorkspace/HarborWorkspace.xcworkspace \
+  -scheme HarborWorkspace -configuration Debug -sdk macosx \
+  -destination 'platform=macOS' build
+buildharbor run -- \
+  -workspace fixtures/HarborWorkspace/HarborWorkspace.xcworkspace \
+  -scheme HarborWorkspace -configuration Debug -sdk macosx \
+  -destination 'platform=macOS' build
+```
 
-**`plan`** validates and prints an argument array, the controlled environment changes, and planned output paths. It creates no directories, resolves no packages, and does not execute `xcodebuild`. Xcode identity comes from the selected installation's version plist. Project and workspace inspection is a bounded static read of source metadata. A plan is a preview: `run` validates again and allocates its own unique receipt, result, archive, or export names.
+During `run`, one bounded `-showBuildSettings -json` query covers the selected scheme and action. A multi-project graph also gets one `-project ... -alltargets` query per static member. Member queries omit `-derivedDataPath` and use explicit output roots, package routes, compiler/cache settings, and `TMPDIR`. Xcode 27 may repeat identical member records; only exact identical member duplicates are ignored. Missing, unknown, or conflicting targets block the action.
 
-The installed launcher disables Python bytecode writes before importing BuildHarbor. When running directly from source, use `PYTHONPATH=src python3 -B -m buildharbor` to keep interpreter cache files out of the checkout too.
+`run` holds one advisory lock per project and streams the requested Xcode action's output. It returns Xcode's exit status, uses `128 + signal` after a forwarded terminating signal, and uses exit 2 for BuildHarbor validation or wrapper failures. After verified storage preparation and child execution, it makes a best-effort receipt write; failures before storage is verified remain stderr and exit-status outcomes.
 
-**`run`** validates again, creates directories on the verified volume, takes an exclusive lock for that checkout and Xcode distribution, and checks a small real write. Project actions perform the bounded effective-setting queries described above; export rechecks the bound archive and receipt. It then rechecks the inputs, volume, and unique destinations before executing the requested action. Output streams directly to your terminal. Interrupt and termination signals are forwarded to each Xcode process group. The normal exit code is Xcode's exit code; signal exits use `128 + signal`. Configuration and wrapper failures use code `2`.
+## Archive and local export
 
-The local receipt includes the BuildHarbor and Xcode versions, action, result, planned paths, observed directory contents, settings-validation summary, input identities where applicable, and unverified behavior. A successful archive receipt also binds the archive digest and the one inspected application. An empty directory is not evidence that Xcode used it. Receipts omit command arguments, the inherited environment, and the captured settings payload. Build logs still belong to Xcode and your project; treat them as potentially private.
+Archive support is limited to one simple macOS application with signing disabled or manual ad-hoc signing using identity `-`. Teams, profiles, keychains, extra signing flags, private identities, other platforms, and distribution workflows are rejected.
 
-**`report`** scans one configured storage root without running Xcode or offering cleanup. `--project-dir` may be repeated, but every configuration must name the exact same mount, volume UUID, and storage root. The text and `--json` forms show per-project, shared, and unattributed unique regular-file totals. A complete report exits 0. An incomplete report preserves observed lower bounds, lists stable issue codes, and exits 2. A verified volume with an absent storage root is a complete empty report.
+```sh
+buildharbor run -- -project fixtures/HarborApp/HarborApp.xcodeproj \
+  -scheme HarborApp -configuration Release \
+  -destination 'platform=macOS' archive
+```
 
-Reporting opens directories and regular files read-only to compare inode metadata; it does not read file contents or write managed storage. The scanner does not count directories. It counts symlinks and special files as ignored, without following them. Logical bytes are unique-inode `st_size`; allocated bytes are unique-inode `st_blocks * 512`. Neither value is an APFS physical-usage, clone-sharing, or reclaimable-capacity estimate. The scan is best-effort and non-atomic.
+Use the exact managed archive path from the successful archive run receipt for export. A path shown by an earlier plan belongs to that preview and is not the path allocated by `run`.
+
+```sh
+buildharbor plan -- \
+  -exportArchive -archivePath '/managed/path/from/archive-receipt.xcarchive'
+buildharbor run -- \
+  -exportArchive -archivePath '/managed/path/from/archive-receipt.xcarchive'
+```
+
+Export accepts only a successful, unchanged BuildHarbor-managed archive for the same project storage and exact Xcode build. BuildHarbor generates fixed local `mac-application` / `export` options and unique outputs. Archive trees containing symlinks, multiply linked regular files, special files, cross-filesystem entries, more than one application, or changed contents are rejected.
+
+The runtime validates effective signing settings and structurally inspects the archive and application. It does not run `codesign` to audit the produced signature or team. Strict ad-hoc/no-team verification in the fixture is evidence for that fixture, not a general signature audit.
+
+## Read-only storage reporting
+
+Report one configured checkout in text or schema-versioned JSON:
+
+```sh
+buildharbor report
+buildharbor report --json
+```
+
+Repeat `--project-dir` to classify several configured checkouts that share the exact same mount, volume UUID, and storage root:
+
+```sh
+buildharbor report \
+  --project-dir /path/to/project-a \
+  --project-dir /path/to/project-b
+```
+
+The report counts each observed regular-file inode once. One known owner is project data, several known owners are shared, and ambiguous IDs, unknown locations, unseen/outside hard links, or conflicting metadata are unattributed. Directories are excluded. Symlinks and special files are skipped and counted without being followed or opened.
+
+Reports include the configured project IDs used for attribution. Treat those IDs as potentially sensitive and redact them before sharing output when they identify private work.
+
+Logical bytes are `st_size`; allocated bytes are `st_blocks * 512`. Neither number is APFS physical usage, clone sharing, snapshot usage, purgeable space, or reclaimable capacity. Scans are best-effort and non-atomic.
+
+A complete report exits 0. An incomplete scan retains observed lower bounds, lists stable issue codes, and exits 2. A verified volume with an absent storage root returns a complete empty report without creating the root. The fixed ceilings are 200,000 entries, 100,000 distinct inodes, depth 64, and 30 seconds. The deadline is cooperative between filesystem calls and cannot interrupt blocked kernel I/O.
+
+Reporting does not read regular-file contents or intentionally write content or metadata. Controlled checks preserve content, mode, modification time, and change time. Access time is excluded because the operating system may update it when metadata descriptors are opened.
 
 ## Routed locations
 
-Each checkout gets a storage key derived from its project path, beneath your chosen root. Xcode distributions have separate subdirectories. Repeated builds reuse these paths; every build, test, or archive action gets a unique `.xcresult` bundle. Settings queries use separate unique result bundles.
+Each checkout gets a storage key beneath the configured root, and each Xcode distribution has separate reusable build directories. Every build, test, and archive action gets a unique result bundle; settings queries use separate unique result bundles.
 
 | Output | Routing control |
 | --- | --- |
 | Build/test DerivedData, products, intermediates | `-derivedDataPath`, `SYMROOT`, `OBJROOT` |
 | Package clones and repository cache | `-clonedSourcePackagesDirPath`, `-packageCachePath` |
-| Clang/Swift module cache | `MODULE_CACHE_DIR`, `CLANG_MODULE_CACHE_PATH` build settings |
+| Clang/Swift module cache | `MODULE_CACHE_DIR`, `CLANG_MODULE_CACHE_PATH` |
 | Compilation cache | `COMPILATION_CACHE_CAS_PATH` |
 | Precompiled headers | `SHARED_PRECOMPS_DIR` |
 | Install staging used by build settings | `DSTROOT` |
 | Temporary files for processes that honor it | `TMPDIR` |
-| Test results | `-resultBundlePath` |
-| Archive | `-archivePath`; Xcode's archive work roots are derived beneath the managed external Derived Data directory |
-| Local export | managed `-exportPath` and a generated `-exportOptionsPlist` |
+| Action and settings-query results | `-resultBundlePath` |
+| Archive | `-archivePath`; action-specific roots below external Derived Data |
+| Local export | managed `-exportPath` and generated `-exportOptionsPlist` |
 
-These controls are checked against the selected distribution and primary sources. See the [published 0.1 routing evidence](docs/verification.md) and [0.2 development evidence](docs/verification-0.2.md) for the distinction between configured paths, observed output, and unverified behavior. This is a storage workflow, not a claim that every write happens on the SSD.
+The remote-package fixture verified repository-cache routing. Some SwiftPM manifest/metadata caches and other toolchain-managed state still use locations outside the supported claim. These controls do not prove that every Xcode, compiler, dependency, plugin, or macOS write occurs on the external volume.
 
-## Accepted arguments and failure behavior
+## Accepted command surface
 
-The published 0.1.0 release requires one `-project`, one shared `-scheme`, and `build` or `test`. The 0.2 checkpoint and current 0.3 checkout also accept `archive`, or the exact export form `-exportArchive -archivePath ARCHIVE`. A build, test, or archive chooses exactly one `-project` or `-workspace` and one statically inspected shared scheme. A graph with more than one project must also provide explicit `-configuration` and `-sdk` values so every member query uses the same selection.
-
-The build, test, and archive actions accept these value options:
+Build, test, and archive require exactly one explicit `-project` or `-workspace` and one statically inspected shared scheme. Accepted value options are:
 
 ```text
 -project  -workspace  -scheme  -configuration  -destination  -sdk  -arch
@@ -181,25 +169,21 @@ The build, test, and archive actions accept these value options:
 -enableCodeCoverage  -testLanguage  -testRegion
 ```
 
-It also accepts `-quiet`, `-showBuildTimingSummary`, `-disableAutomaticPackageResolution`, `-onlyUsePackageVersionsFromResolvedFile`, `-skipPackageUpdates`, and inline `-only-testing:Identifier` / `-skip-testing:Identifier`. The only caller-supplied build settings are `CODE_SIGNING_ALLOWED`, `CODE_SIGNING_REQUIRED`, `ONLY_ACTIVE_ARCH`, and `ENABLE_TESTABILITY`, each set to `YES` or `NO`.
+Accepted switches are `-quiet`, `-showBuildTimingSummary`, `-disableAutomaticPackageResolution`, `-onlyUsePackageVersionsFromResolvedFile`, and `-skipPackageUpdates`, plus inline `-only-testing:Identifier` and `-skip-testing:Identifier`. The caller-supplied build settings are limited to `CODE_SIGNING_ALLOWED`, `CODE_SIGNING_REQUIRED`, `ONLY_ACTIVE_ARCH`, and `ENABLE_TESTABILITY`, each set to `YES` or `NO`.
 
-Unknown actions/options, duplicate flags/settings, caller-supplied output paths, command-line xcconfig files, and inherited output, compiler, or signing overrides are rejected. Test-only options require `test`. `.xctestplan` files, `TestPlanReference` scheme entries, and caller-supplied `-testPlan` are rejected because their contents are not inspected. Private or autogenerated schemes, script phases, custom rules, unsupported object types, unsafe copy destinations, unresolved graph references, and managed settings in project or xcconfig source are also rejected. Effective output settings must resolve beneath the approved storage root for the selected scheme and every statically inspected member target. This conservative subset can block a valid Xcode project.
+Unknown or duplicate arguments, caller-supplied output paths, command-line xcconfig files, inherited output/compiler/signing overrides, private or autogenerated schemes, script phases, custom rules, unsupported objects or copy destinations, unresolved graph references, and source-defined managed output settings are rejected. Shared schemes that select test plans through `TestPlans` or `TestPlanReference`, and caller-supplied `-testPlan`, are unsupported because BuildHarbor does not inspect that input graph.
 
-If the disk is absent, locked, wrong, read-only, below the configured capacity threshold, or inaccessible, the build does not start. BuildHarbor never creates a replacement mount directory or silently chooses internal storage. Existing symlinks in managed output paths are rejected, including links that remain on the same disk. Another BuildHarbor run using the same build directory receives a lock error.
+This conservative surface can block a valid Xcode project.
 
-## Limits to understand before using it
+## Limits and evidence
 
-- BuildHarbor controls selected output locations. It is **not a filesystem sandbox**. Arbitrary build scripts, package plugins, Xcode services, simulators, and macOS may write elsewhere.
-- It does not control builds launched directly from Xcode's graphical interface, or another tool that bypasses BuildHarbor and its lock.
-- The current development line checks a defined set of effective output settings. It does not prove that every Xcode setting or project tool is harmless, and it rejects script phases and custom rules instead of trying to analyze their effects.
-- The 0.3 report is bounded to 200,000 directory entries, 100,000 distinct inodes, depth 64, and 30 seconds. Its deadline is checked between filesystem operations and cannot interrupt a kernel I/O call that is already blocked.
-- Reporting does not modify file content, mode, modification time, or change time under BuildHarbor's control. Opening files and directories for metadata can still let the operating system update access time, so BuildHarbor makes no access-time guarantee.
-- Preflight checks and directory-fd operations reduce accidental path mistakes. They cannot guarantee protection against every mount change, malicious local race, force-kill, or mid-build disconnection. A failed or disconnected destination can also prevent receipt creation; that failure is reported.
-- There is no automatic cleanup, data migration, global Xcode configuration, simulator relocation, background service, or registry publication. Archive/export support remains limited to the local macOS workflow above.
-- The JSON objects carry `schema_version: 1`; their full contract is still experimental until 1.0.
-- The current compatibility allowlist remains one exact Xcode build. The controlled 0.2 fixture evidence does not establish real signing/distribution, large-project, iOS, simulator, or broader project compatibility.
-- Some SwiftPM global manifest/metadata caches use toolchain-selected locations. The package-cache routing verified here covers repository caching; it does not relocate every SwiftPM cache.
+- BuildHarbor does not control GUI Xcode or tools that bypass its command and advisory lock.
+- The volume can disconnect or change after a check. BuildHarbor revalidates at defined boundaries but cannot make Xcode writes atomic.
+- Settings and receipts can contain project metadata and local paths. Review them before sharing.
+- There is no cleanup, migration, global Xcode configuration, simulator relocation, background service, signing/distribution automation, or registry publication.
+- Configuration, plan, receipt, doctor, error, and storage-report JSON use `schema_version: 1`; these contracts remain experimental until 1.0.
+- Compatibility is limited to the exact platform, toolchain, and controlled project shapes in the verification record.
 
-External storage and Xcode path configuration already exist. BuildHarbor's focus is the tested volume guard and a plan/run/receipt workflow you can review. [Comparison with DevCleaner, mac-ssd-rescue, VibeChard, and fastlane](docs/comparison.md).
+All 117 unit and small-process tests passed under Python 3.11.13 and 3.13.4. Controlled local checks passed build, test, a two-member workspace build, archive, local export, and report classification on Apple Silicon with macOS 27.0 (26A428) and Xcode 27.0 (27A266a). An isolated installation of the committed candidate revision also passed before release preparation; that is not a fresh installation from the final tag. The evidence does not establish broader project, platform, signing, or filesystem compatibility.
 
-See the [roadmap and internal validation plan](ROADMAP.md), [contribution guide](CONTRIBUTING.md), [security scope](SECURITY.md), [storage-guard decision](docs/adr/0001-storage-guard.md), [0.2 settings/archive decision](docs/adr/0002-effective-settings-and-local-export.md), and [0.3 reporting decision](docs/adr/0003-read-only-storage-reporting.md).
+See the [0.3 verification record](docs/verification-0.3.md), [release notes](docs/release-0.3.0.md), [roadmap](ROADMAP.md), [contribution guide](CONTRIBUTING.md), [security policy](SECURITY.md), [storage-guard decision](docs/adr/0001-storage-guard.md), [effective-settings/archive decision](docs/adr/0002-effective-settings-and-local-export.md), and [reporting decision](docs/adr/0003-read-only-storage-reporting.md).
